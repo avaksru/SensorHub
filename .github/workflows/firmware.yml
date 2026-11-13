@@ -114,6 +114,11 @@ jobs:
       - name: Сборка bin-файлов (merged + OTA)
         shell: bash
         run: |
+          # GHA запускает каждый run-шаг в новой оболочке без env export.sh —
+          # активируем окружение IDF заново, чтобы python3 был из venv IDF
+          # (в системном python нет модуля esptool)
+          . "$IDF_PATH/export.sh"
+
           python3 - <<'PY'
           import json, os, shutil, subprocess, sys
 
