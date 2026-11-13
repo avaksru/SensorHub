@@ -3,7 +3,8 @@ idf_component_register(
     INCLUDE_DIRS "include"
     REQUIRES sensor_manager app_config wifi_manager mqtt_manager gpio_map lua_runtime esp_http_server cjson esp_common esp_event esp_netif esp_wifi app_update esp_app_format esp_partition web_console time_sync virtual_state bus_i2c
     # heap: heap_caps_* (/api/system); esp_hw_support: esp_clk_cpu_freq; storage_littlefs: занятость ФС (/api/system)
-    PRIV_REQUIRES heap esp_timer esp_hw_support storage_littlefs
+    # esp_http_client + mbedtls (esp_crt_bundle): скачивание обновления с GitHub (POST /api/ota/upgrade)
+    PRIV_REQUIRES esp_http_client mbedtls heap esp_timer esp_hw_support storage_littlefs
 )
 
 # Web UI embedded as gzip: index.html is compressed at build time and served

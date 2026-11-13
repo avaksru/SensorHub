@@ -367,6 +367,7 @@ body.net-off #tiles{opacity:.55}
       <article class="card" id="c-fw">
         <h2>Текущая прошивка</h2>
         <div id="oinfo" class="lst"></div>
+        <div id="ohub" class="lst" style="display:none;margin-top:10px"></div>
         <div class="me" id="fwusb" style="display:none">В сборке без OTA-слотов раздел «Обновление прошивки (OTA)» скрыт — прошивка обновляется только по USB.</div>
       </article>
     </div>
@@ -1194,14 +1195,110 @@ async function otaLoad(){
   const o=await api('/api/ota');
   if(!o){$('oinfo').innerHTML='<div class="empty">Нет данных о прошивке</div>';return}
   const nu=$('fwusb');if(nu)nu.style.display=o.available===false?'':'none';   /* пояснение «по USB» — только на сборках без OTA */
-  const rows=[['Версия',o.version],['Проект',o.project],['Сборка',(o.build_date||'')+' '+(o.build_time||'')],['IDF',(o.idf||'').replace(/;/g,' ')],
+  /* «Прошивка» — обозначение платы (FW_BOARD_TEXT), у старых прошивок — хвост
+     строки app desc после первого токена; «Номер» — version из
+     firmware_version.json (FW_VERSION_TEXT), у старых — первый токен. */
+  const board=o.board||(o.version||'').split(' ').slice(1).join(' ')||'—';
+  const vnum=o.version_num||(o.version||'').split(' ')[0]||'—';
+  const rows=[['Прошивка',board],['Номер',vnum],['Сборка',(o.build_date||'')+' '+(o.build_time||'')],['IDF',(o.idf||'').replace(/;/g,' ')],
     ['Активный слот',(o.running||'—')+' · '+Math.round((o.running_size||0)/1024)+' КБ'],
     ['Свободный слот',o.next&&o.next!=='-'?o.next+' · '+Math.round((o.next_size||0)/1024)+' КБ':'—']];   /* без OTA-слотов свободного нет — «—» */
   $('oinfo').innerHTML=rows.map(r=>'<div class="it"><span class="nm">'+H(r[0])+'</span><span class="me" style="text-align:right">'+H(r[1])+'</span></div>').join('');
+  hubCheck(o);   /* проверка ночного релиза на GitHub — блок обновления ниже в этой карточке */
 }
 /* во время OTA-загрузки и последующей перезагрузки устройство недоступно
    ожидаемо — сердцебиение не должно показывать баннер «нет связи» */
 let otaUp=0;
+
+/* --- обновление с GitHub (ночной релиз): доступную версию берём из
+   firmware_version.json репозитория ota_repo (поле OTAgitRepo из
+   firmware_version.json) — браузер читает raw.githubusercontent.com напрямую
+   (github отдаёт CORS «*»), а сам .bin скачивает устройство: POST
+   /api/ota/upgrade → <OTAgitRepo>/releases/download/nightly/ota_<плата>_
+   sensor_hub.bin; статус загрузки — GET /api/ota (dl_status/dl_progress). --- */
+let hubBg=0,hubUpd=0;
+function hubShow(html){
+  const el=$('ohub');if(!el)return;
+  if(!html){el.innerHTML='';el.style.display='none';return}
+  el.innerHTML=html;el.style.display='';
+}
+async function hubCheck(o){
+  if(hubBg)return;                         /* идёт обновление — статусы показывает таймер */
+  if(!o||o.available===false||!o.ota_repo){hubShow(null);return}
+  if(o.dl_status===1||o.dl_status===2){    /* страница открыта во время/сразу после фоновой загрузки — подключаемся к статусу */
+    hubBg=1;hubUpd=1;
+    hubShow('<div class="me" id="ohubst">Скачивание прошивки с GitHub…</div>');
+    hubPoll(null);
+    return;
+  }
+  hubShow(null);
+  const m=/^https?:\/\/github\.com\/([^\/?#]+)\/([^\/?#]+)/i.exec(String(o.ota_repo).replace(/\/+$/,''));
+  if(!m)return;
+  const local=o.version_num||(o.version||'').split(' ')[0]||'';
+  let remote='';
+  for(const br of ['main','master']){      /* main — как в CI; master — запас */
+    try{
+      const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),8000);
+      const r=await fetch('https://raw.githubusercontent.com/'+m[1]+'/'+m[2]+'/'+br+'/firmware_version.json',{cache:'no-store',signal:ctl.signal});
+      clearTimeout(tm);
+      if(r.ok){const j=await r.json().catch(()=>null);if(j&&j.version){remote=j.version;break}}
+    }catch(_){}
+  }
+  if(hubBg)return;
+  if(!remote||remote===local)return;       /* прочитать не удалось или версии совпали — блок не показываем */
+  hubShow('<div class="it"><span class="nm">Версия на GitHub (nightly)</span>'+
+    '<span class="me" style="text-align:right">'+H(remote)+'</span></div>'+
+    '<div class="act"><button class="b sml" id="ohubb">⬇ Обновить</button></div>'+
+    '<div class="me" id="ohubst"></div>');
+  $('ohubb').onclick=()=>hubUpgrade(remote,local);
+}
+async function hubUpgrade(remote,local){
+  const btn=$('ohubb');if(!btn||hubBg)return;
+  if(!confirm('Скачать прошивку '+remote+' с GitHub и установить вместо текущей версии ('+local+')?\nЗагрузка идёт 1–3 минуты, затем устройство перезагрузится само.\nНе выключайте питание и не закрывайте страницу.'))return;
+  btn.disabled=true;hubBg=1;hubUpd=1;$('ohubst').textContent='Запуск обновления…';
+  let r;
+  try{r=await fetch('/api/ota/upgrade',{method:'POST'})}
+  catch(_){hubBg=0;hubUpd=0;btn.disabled=false;$('ohubst').textContent='⚠ Сеть недоступна';return}
+  if(!r.ok){
+    hubBg=0;hubUpd=0;btn.disabled=false;
+    const tx=await r.text().catch(()=>'');
+    $('ohubst').textContent='⚠ Ошибка '+r.status+': '+(tx||'подробности в serial-журнале');
+    return;
+  }
+  hubPoll(btn);
+}
+function hubPoll(btn){
+  const t=setInterval(async()=>{
+    const o=await api('/api/ota');if(!o)return;
+    const st=$('ohubst');
+    if(o.dl_status===1){
+      if(st)st.textContent='Скачивание с GitHub '+(o.dl_progress>=0?o.dl_progress+' %':'…')+' — не закрывайте страницу';
+      return;
+    }
+    clearInterval(t);
+    if(o.dl_status===3){
+      hubBg=0;hubUpd=0;if(btn)btn.disabled=false;
+      if(st)st.textContent='⚠ Не удалось загрузить прошивку: '+(o.dl_err||'ошибка');
+      return;
+    }
+    if(o.dl_status!==2){                   /* устройство перезагрузилось до опроса — прячем блок */
+      hubBg=0;hubUpd=0;if(btn)btn.disabled=false;hubShow(null);
+      return;
+    }
+    if(st)st.textContent='Прошивка установлена — устройство перезагружается…';
+    let tries=30;
+    const wait=()=>{
+      fetch('/api/ota',{cache:'no-store'}).then(resp=>{
+        if(resp.ok){toast('✔ Прошивка обновлена');setTimeout(()=>location.reload(),600);return}
+        throw 0
+      }).catch(()=>{
+        if(--tries>0)setTimeout(wait,1500);
+        else{if(st)st.textContent='⚠ Устройство не вернулось на связь — проверьте питание';hubBg=0;hubUpd=0}
+      });
+    };
+    setTimeout(wait,1500);
+  },1000);
+}
 $('ofin').onchange=()=>{$('oup').disabled=!$('ofin').files.length};
 $('oup').onclick=()=>{
   const f=$('ofin').files[0];
@@ -1344,7 +1441,7 @@ async function heartBeat(){
     if(netOff)setNet(false);
   }catch(_){
     if(gen!==beatGen)return;   /* отменён новым вызовом — не считаем неудачей */
-    if(++beatFail>=2&&!netOff&&!otaUp)setNet(true);
+    if(++beatFail>=2&&!netOff&&!otaUp&&!hubUpd)setNet(true);
   }
 }
 $('nrel').onclick=()=>location.reload();

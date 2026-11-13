@@ -4,11 +4,13 @@
 #   sdkconfig.c6_4mb_noota — ESP32-C6, 4 МБ без OTA (factory 3.44 МБ, без coredump)
 #   sdkconfig.c6_8mb_ota   — ESP32-C6, 8 МБ с OTA-слотами по 3 МБ
 # Порядок списка важен: файлы после базы переопределяют таблицу разделов и размер flash.
-# Версия прошивки в app desc (вкладка «Система», поле «Версия») вместо git-хеша —
-# обозначение целевой платы: база (partitions.csv) = ESP32 4Mb OTA; два варианта
-# ESP32-C6 переопределяют строку на ESP32-C6 4Mb NoOTA / ESP32-C6 8Mb OTA.
-CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
-CONFIG_APP_PROJECT_VER="ESP32 4Mb OTA"
+# Версия прошивки в app desc (вкладка «Система», поле «Версия») собирается
+# в CMakeLists.txt: «version» из firmware_version.json + обозначение целевой
+# платы по цепочке SDKCONFIG_DEFAULTS (база = ESP32 4Mb OTA; варианты C6
+# переопределяют на ESP32-C6 4Mb NoOTA / ESP32-C6 8Mb OTA).
+# PROJECT_VER из CMakeLists.txt учитывается только при выключенной опции ниже:
+# иначе IDF подставляет CONFIG_APP_PROJECT_VER и игнорирует файл версии.
+# CONFIG_APP_PROJECT_VER_FROM_CONFIG is not set
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y

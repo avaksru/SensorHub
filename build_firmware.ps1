@@ -1,7 +1,7 @@
 # Локальная сборка прошивки Sensor Hub. Вариант платы — как в CI
 # (.github/workflows/firmware.yml); версия прошивки в app desc (вкладка
-# «Система», поле «Версия») задается в sdkconfig.defaults / sdkconfig.c6_*
-# и совпадает с названием варианта.
+# «Система», поле «Версия») = «version» из firmware_version.json + суффикс
+# платы варианта (склейка выполняется в CMakeLists.txt).
 #
 #   .\build_firmware.ps1                           # ESP32-C6, 8 МБ, OTA (по умолчанию)
 #   .\build_firmware.ps1 -Variant esp32c6-4mb-noota
@@ -10,7 +10,7 @@ param([ValidateSet('esp32-4mb-ota','esp32c6-4mb-noota','esp32c6-8mb-ota')][strin
 
 $ErrorActionPreference = "Stop"
 & 'C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1'
-Set-Location 'C:\GitHub\AVAKS\esp-iot-solution\esp-iot-solution\examples\sensors\dynamic_config_sensor_hub'
+Set-Location 'C:\GitHub\AVAKS\SensorHub'
 
 switch ($Variant) {
     'esp32-4mb-ota'     { $Target = 'esp32';   $Defaults = 'sdkconfig.defaults' }

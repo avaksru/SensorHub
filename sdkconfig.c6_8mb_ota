@@ -6,7 +6,7 @@
 # В CI: idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.c6_8mb_ota"
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_c6_8mb_ota.csv"
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
-# Версия прошивки в app desc (вкладка «Система»): целевая плата — ESP32-C6,
-# 8 МБ flash, с OTA. Переопределяет строку из sdkconfig.defaults (esp32-4mb-ota).
-CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
-CONFIG_APP_PROJECT_VER="ESP32-C6 8Mb OTA"
+# Обозначение платы для версии прошивки в app desc (см. CMakeLists.txt):
+# этот вариант цепочки SDKCONFIG_DEFAULTS → «ESP32-C6 8Mb OTA»
+# (+ «version» из firmware_version.json).
+# CONFIG_APP_PROJECT_VER_FROM_CONFIG is not set

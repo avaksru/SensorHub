@@ -3,7 +3,9 @@
 #include "bus_i2c.h"
 #include "config_store.h"
 #include "esp_check.h"
+#include "esp_crt_bundle.h"
 #include "esp_event.h"
+#include "esp_http_client.h"
 #include "esp_http_server.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -50,6 +52,65 @@ static httpd_handle_t s_server = nullptr;
 static bool s_ota_busy = false;
 static uint8_t s_ota_chunk[8192];
 
+/* --- обновление с GitHub (вкладка «Система», POST /api/ota/upgrade) ---
+   Значения прошивки задаёт корневой CMakeLists.txt из firmware_version.json:
+   FW_VERSION_TEXT = «version» (поле «Номер» на странице), FW_BOARD_TEXT —
+   обозначение платы (поле «Прошивка»), FW_OTA_REPO_TEXT — репозиторий
+   релиза «nightly». Для прошивок, собранных до FW_*_TEXT, номер и плата
+   разбираются из строки app desc «<номер> <плата>» (fw_version_parts). */
+#ifndef FW_VERSION_TEXT
+#define FW_VERSION_TEXT ""
+#endif
+#ifndef FW_BOARD_TEXT
+#define FW_BOARD_TEXT ""
+#endif
+#ifndef FW_OTA_REPO_TEXT
+#define FW_OTA_REPO_TEXT ""
+#endif
+
+/* Разбор метаданных прошивки: номер и обозначение платы отдельно. */
+static void fw_version_parts(std::string &num, std::string &board) {
+    const std::string full = esp_app_get_description() ? esp_app_get_description()->version : "";
+    if (FW_VERSION_TEXT[0]) {
+        num = FW_VERSION_TEXT;
+    } else {
+        const size_t sp = full.find(' ');             /* fallback: до первого пробела */
+        num = (sp == std::string::npos) ? full : full.substr(0, sp);
+    }
+    if (FW_BOARD_TEXT[0]) {
+        board = FW_BOARD_TEXT;
+    } else {
+        const size_t sp = full.find(' ');             /* fallback: остаток строки */
+        board = (sp == std::string::npos) ? std::string() : full.substr(sp + 1);
+    }
+}
+
+/* Ссылка bin-образа этой платы в ночном релизе: плата «ESP32-C6 8Mb OTA» →
+   <OTAgitRepo>/releases/download/nightly/ota_ESP32-C6_8mb_sensor_hub.bin
+   (имена артефактов задаёт .github/workflows/firmware.yml). Пусто — обновление
+   не предлагается: нет OTA-слотов, вариант «…NoOTA» или OTAgitRepo не задан. */
+static std::string ota_bin_url() {
+    if (!FW_OTA_REPO_TEXT[0]) return std::string();
+    std::string b = FW_BOARD_TEXT;
+    if (b.size() > 4 && b.compare(b.size() - 4, 4, " OTA") == 0) b.erase(b.size() - 4);
+    else return std::string();                        /* сборка без OTA («…NoOTA») */
+    if (!esp_ota_get_next_update_partition(nullptr)) return std::string();
+    std::replace(b.begin(), b.end(), ' ', '_');       /* «ESP32-C6 8Mb» → «ESP32-C6_8Mb» */
+    const size_t p = b.find("Mb");
+    if (p != std::string::npos) b.replace(p, 2, "mb");  /* CI-имя: ESP32-C6_8mb */
+    return std::string(FW_OTA_REPO_TEXT) + "/releases/download/nightly/ota_" + b + "_sensor_hub.bin";
+}
+
+/* Состояние фоновой загрузки с GitHub: dl_status 0 — не выполнялась,
+   1 — идёт, 2 — ок (перезагрузка), 3 — ошибка; dl_progress 0..100 (-1 —
+   объём не известен). Пишет только задание ota_github, читает httpd-поток
+   (GET /api/ota) — рассинхронизация int/строки безопасна. */
+static std::string s_dl_url;             /* ссылка текущей загрузки (читает задание) */
+static volatile int s_dl_status = 0;
+static volatile int s_dl_progress = -1;
+static char s_dl_err[128] = "";          /* ошибка загрузки для web-интерфейса */
+static uint8_t s_dl_chunk[4096];         /* буфер приёма HTTPS-потока */
+
 static esp_err_t supported_handler(httpd_req_t *req);
 static esp_err_t config_get_handler(httpd_req_t *req);
 static esp_err_t config_post_handler(httpd_req_t *req);
@@ -69,6 +130,7 @@ static esp_err_t control_post_handler(httpd_req_t *req);
 static esp_err_t virtual_list_handler(httpd_req_t *req);
 static esp_err_t virtual_post_handler(httpd_req_t *req);
 static esp_err_t ota_status_handler(httpd_req_t *req);
+static esp_err_t ota_upgrade_handler(httpd_req_t *req);
 static esp_err_t ota_upload_handler(httpd_req_t *req);
 static esp_err_t system_status_handler(httpd_req_t *req);
 static esp_err_t backup_get_handler(httpd_req_t *req);
@@ -451,8 +513,12 @@ static esp_err_t ota_status_handler(httpd_req_t *req) {
     const esp_partition_t *running = esp_ota_get_running_partition();
     const esp_partition_t *next = esp_ota_get_next_update_partition(nullptr);
     const esp_app_desc_t *app = esp_app_get_description();
+    std::string vnum, board;
+    fw_version_parts(vnum, board);
     cJSON *o = cJSON_CreateObject();
     cJSON_AddStringToObject(o, "version", app->version);
+    cJSON_AddStringToObject(o, "version_num", vnum.c_str());   /* «Номер»: version из firmware_version.json */
+    cJSON_AddStringToObject(o, "board", board.c_str());        /* «Прошивка»: обозначение платы */
     cJSON_AddStringToObject(o, "project", app->project_name);
     cJSON_AddStringToObject(o, "idf", app->idf_ver);
     cJSON_AddStringToObject(o, "build_date", app->date);
@@ -464,6 +530,15 @@ static esp_err_t ota_status_handler(httpd_req_t *req) {
     /* available=false — OTA-разделов нет (сборка без OTA): web-интерфейс прячет блоки OTA на вкладке «Система» */
     cJSON_AddBoolToObject(o, "available", next != nullptr);
     cJSON_AddBoolToObject(o, "busy", s_ota_busy);
+    /* обновление с GitHub: пустой ota_url — страница не предлагает обновление;
+       репозиторий отдаётся странице для проверки версии на raw.githubusercontent.com */
+    const std::string url = ota_bin_url();
+    cJSON_AddStringToObject(o, "ota_url", url.c_str());
+    cJSON_AddStringToObject(o, "ota_repo", FW_OTA_REPO_TEXT);
+    /* статус фоновой загрузки с GitHub: dl_status 0/1(идёт)/2(ок)/3(ошибка) */
+    cJSON_AddNumberToObject(o, "dl_status", s_dl_status);
+    cJSON_AddNumberToObject(o, "dl_progress", s_dl_progress);
+    cJSON_AddStringToObject(o, "dl_err", s_dl_err);
     char *str = cJSON_PrintUnformatted(o);
     httpd_resp_set_type(req, "application/json");
     esp_err_t r = httpd_resp_send(req, str, strlen(str));
@@ -551,6 +626,131 @@ static esp_err_t ota_upload_handler(httpd_req_t *req) {
     httpd_resp_sendstr(req, msg);
     xTaskCreate(ota_reboot_task, "ota_reboot", 2048, nullptr, 5, nullptr);
     return ESP_OK;
+}
+
+/* ------------------------------------------------------------------ */
+/* Обновление с GitHub: POST /api/ota/upgrade запускает фоновое задание,
+   которое скачивает bin-образ ночной сборки этой платы
+   (<OTAgitRepo>/releases/download/nightly/ota_<плата>_sensor_hub.bin)
+   в свободный OTA-слот и перезагружает устройство. Скачивание фоновое,
+   т.к. httpd однопоточный и не должен блокироваться на TLS-приёме ~2 МБ;
+   статусы — поля dl_* в GET /api/ota (опрашивает web-интерфейс); после
+   перезагрузки состояние dl_* сбрасывается.                            */
+/* ------------------------------------------------------------------ */
+static void ota_github_task(void *arg) {
+    (void)arg;
+    s_dl_progress = 0;
+    esp_http_client_config_t cfg = {};
+    cfg.url = s_dl_url.c_str();
+    cfg.timeout_ms = 15000;               /* коннект и чтение порции */
+    cfg.buffer_size = 4096;               /* приёмный буфер TLS */
+    cfg.buffer_size_tx = 1024;
+    cfg.keep_alive_enable = false;        /* одноразовое соединение */
+#ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
+    cfg.crt_bundle_attach = esp_crt_bundle_attach;   /* корневые CA GitHub — шинный пакет mbedtls */
+#endif
+    esp_err_t err = ESP_OK;
+    int64_t total = -1;
+    size_t received = 0;
+    esp_ota_handle_t handle = 0;
+    bool ota_opened = false;
+    const esp_partition_t *target = esp_ota_get_next_update_partition(nullptr);
+    esp_http_client_handle_t client = esp_http_client_init(&cfg);
+    if (!client) err = ESP_ERR_NO_MEM;
+    if (err == ESP_OK) err = esp_http_client_open(client, 0);
+    if (err == ESP_OK) {
+        esp_http_client_fetch_headers(client);
+        total = esp_http_client_get_content_length(client);
+        const int code = esp_http_client_get_status_code(client);
+        if (code < 200 || code >= 300) {
+            snprintf(s_dl_err, sizeof(s_dl_err), "HTTP %d от GitHub", code);
+            ESP_LOGE(TAG, "OTA с GitHub: HTTP %d (%s)", code, s_dl_url.c_str());
+            err = ESP_FAIL;
+        }
+    }
+    if (err == ESP_OK && !target) err = ESP_ERR_NOT_SUPPORTED;
+    if (err == ESP_OK) err = esp_ota_begin(target, OTA_SIZE_UNKNOWN, &handle);
+    if (err == ESP_OK) ota_opened = true;
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "OTA с GitHub: скачивание %s", s_dl_url.c_str());
+        while (true) {
+            const int r = esp_http_client_read(client, (char *)s_dl_chunk, sizeof(s_dl_chunk));
+            if (r < 0) { err = ESP_FAIL; break; }         /* соединение оборвалось */
+            if (r == 0) {                                 /* потока больше нет */
+                if (esp_http_client_is_complete_data_received(client)) break;
+                err = ESP_FAIL;                           /* закрылся раньше объёма — образ неполный */
+                break;
+            }
+            err = esp_ota_write(handle, s_dl_chunk, r);
+            if (err != ESP_OK) break;
+            received += (size_t)r;
+            if (total > 0) s_dl_progress = (int)((uint64_t)received * 100ULL / (uint64_t)total);
+            if (received % (256 * 1024) < (size_t)r)      /* прогресс каждые ~256 КБ в журнал */
+                ESP_LOGI(TAG, "OTA с GitHub: %u из %d", (unsigned)received, (int)total);
+        }
+    }
+    if (err == ESP_OK && received < 64)
+        err = ESP_ERR_INVALID_SIZE;       /* короче заголовка образа — не прошивка */
+    if (err == ESP_OK)
+        err = esp_ota_end(handle);        /* проверяет magic/размер/хеш образа */
+    else if (ota_opened && handle)
+        esp_ota_abort(handle);
+    if (err == ESP_OK && target)
+        err = esp_ota_set_boot_partition(target);
+    if (client) {
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+    }
+    if (err == ESP_OK) {
+        s_dl_progress = 100;
+        s_dl_status = 2;                  /* ок — браузер видит успех и ждёт перезагрузку */
+        ESP_LOGI(TAG, "OTA с GitHub ок: %u байт в '%s', перезагрузка", (unsigned)received, target->label);
+        vTaskDelay(pdMS_TO_TICKS(2000));  /* дать браузеру увидеть dl_status=2 */
+        esp_restart();
+    }
+    if (!s_dl_err[0]) snprintf(s_dl_err, sizeof(s_dl_err), "%s", esp_err_to_name(err));
+    ESP_LOGE(TAG, "OTA с GitHub неудачно: %s (%u байт)", s_dl_err, (unsigned)received);
+    s_dl_status = 3;
+    s_ota_busy = false;                   /* можно повторить попытку */
+    vTaskDelete(nullptr);
+}
+
+/* POST /api/ota/upgrade — обновление из ночного релиза GitHub для этой платы.
+   Ответ приходит сразу («started»); далее фоновое задание скачивает образ,
+   а статусы читаются из GET /api/ota (dl_status/dl_progress/dl_err). */
+static esp_err_t ota_upgrade_handler(httpd_req_t *req) {
+    if (s_ota_busy) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "ota already in progress");
+        return ESP_FAIL;
+    }
+    const esp_partition_t *target = esp_ota_get_next_update_partition(nullptr);
+    if (!target) {
+        /* сборка без OTA-разделов: обновление по воздуху не поддерживается */
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "ota not available");
+        return ESP_FAIL;
+    }
+    const std::string url = ota_bin_url();
+    if (url.empty()) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "ota url not configured");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "OTA с GitHub стартует: %s", url.c_str());
+    s_ota_busy = true;                    /* блокирует и ручной POST /api/ota до конца загрузки */
+    s_dl_url = url;
+    s_dl_status = 1;
+    s_dl_progress = -1;
+    s_dl_err[0] = 0;
+    if (xTaskCreate(ota_github_task, "ota_github", 8192, nullptr, 5, nullptr) != pdPASS) {
+        s_ota_busy = false;
+        s_dl_status = 0;
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "cannot start ota task");
+        return ESP_FAIL;
+    }
+    char msg[256];
+    snprintf(msg, sizeof(msg), "{\"status\":\"started\",\"slot\":\"%s\",\"url\":\"%s\"}",
+             target->label, url.c_str());
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, msg);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1197,9 +1397,10 @@ static esp_err_t server_start_once(void) {
        переполнение стека httpd затирает соседние блоки кучи молча и ломает
        пул (Load access fault в heap_caps_get_largest_free_block) */
     config.stack_size = 8192;
-        /* слоты = пары URI+метод: маршрутов 35 (/api/virtual GET+POST и
-           /api/control включены); с запасом 40 — /api/backup не выпадал:
-           ранее 28 слотов не хватало и GET+POST /api/backup не регистрировались */
+        /* слоты = пары URI+метод: маршрутов 36 (/api/virtual GET+POST,
+           /api/control и /api/ota/upgrade включены); с запасом 40 —
+           /api/backup не выпадал: ранее 28 слотов не хватало и
+           GET+POST /api/backup не регистрировались */
         config.max_uri_handlers = 40;
     config.lru_purge_enable = true;      /* вытеснять самые старые сессии при нехватке слотов */
     config.keep_alive_enable = true;     /* забирать зависшие подключения */
@@ -1235,6 +1436,7 @@ static esp_err_t server_start_once(void) {
         {.uri = "/api/control",           .method = HTTP_POST,   .handler = control_post_handler,    .user_ctx = nullptr},
         {.uri = "/api/ota",               .method = HTTP_GET,    .handler = ota_status_handler,      .user_ctx = nullptr},
         {.uri = "/api/ota",               .method = HTTP_POST,   .handler = ota_upload_handler,      .user_ctx = nullptr},
+        {.uri = "/api/ota/upgrade",       .method = HTTP_POST,   .handler = ota_upgrade_handler,     .user_ctx = nullptr},
         {.uri = "/api/system",            .method = HTTP_GET,    .handler = system_status_handler,   .user_ctx = nullptr},
         {.uri = "/api/scripts",           .method = HTTP_GET,    .handler = scripts_router_handler,  .user_ctx = nullptr},
         {.uri = "/api/scripts",           .method = HTTP_POST,   .handler = scripts_post_handler,    .user_ctx = nullptr},
