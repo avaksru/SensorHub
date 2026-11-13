@@ -45,11 +45,17 @@ endif()
 # обновление (firmware_version.json репозитория, релиз «nightly»:
 # <OTAgitRepo>/releases/download/nightly/ota_<плата>_sensor_hub.bin).
 # В app desc строка = <version> + обозначение платы. Обозначение платы
-# определяется по цепочке SDKCONFIG_DEFAULTS, которую
-# передают .github/workflows/firmware.yml и build_firmware.ps1:
-#   sdkconfig.c6_4mb_noota → ESP32-C6 4Mb NoOTA
-#   sdkconfig.c6_8mb_ota   → ESP32-C6 8Mb OTA
-#   остальное (база, partitions.csv) → ESP32 4Mb OTA
+# выводится из фактической конфигурации сборки — целевого чипа (IDF_TARGET)
+# и таблицы разделов (CONFIG_PARTITION_TABLE_CUSTOM_FILENAME):
+#   esp32   + partitions.csv              → ESP32 4Mb OTA
+#   esp32c6 + partitions_c6_4mb_noota.csv → ESP32-C6 4Mb NoOTA
+#   esp32c6 + partitions_c6_8mb_ota.csv   → ESP32-C6 8Mb OTA
+# Цепочку SDKCONFIG_DEFAULTS (вариант платы) передают .github/workflows/
+# firmware.yml и build_firmware.ps1, но кнопка Build VS Code может собрать
+# и без неё, переиспользуя существующий sdkconfig, — тогда чип и таблица
+# берутся из него. Метка следует за конфигурацией, а не за аргументами
+# сборки; неверные комбинации чипа и таблицы — ошибка сборки, а не
+# молчаливо неверный OTA-URL (см. ниже).
 #
 # IDF учитывает PROJECT_VER только когда CONFIG_APP_PROJECT_VER_FROM_CONFIG
 # выключен (см. sdkconfig.defaults); в app desc строка ограничена 32 байтами
@@ -78,7 +84,15 @@ set(FW_OTA_REPO "${CMAKE_MATCH_1}")
 # CONFIG_APP_PROJECT_VER_FROM_CONFIG=y, IDF отбросит PROJECT_VER из этого файла
 # и подставит старый CONFIG_APP_PROJECT_VER. Требуем перегенерацию sdkconfig
 # (build_firmware.ps1 удаляет его перед сборкой; здесь — явная ошибка).
-set(_fw_sdkconfig_file "${CMAKE_SOURCE_DIR}/sdkconfig")
+# Путь sdkconfig: нестандартные сборки задают -DSDKCONFIG / $ENV{SDKCONFIG}
+# (трактовка — как в tools/cmake/kconfig.cmake IDF), обычные — корень проекта.
+if(SDKCONFIG)
+    set(_fw_sdkconfig_file "${SDKCONFIG}")
+elseif(DEFINED ENV{SDKCONFIG} AND NOT "$ENV{SDKCONFIG}" STREQUAL "")
+    set(_fw_sdkconfig_file "$ENV{SDKCONFIG}")
+else()
+    set(_fw_sdkconfig_file "${CMAKE_SOURCE_DIR}/sdkconfig")
+endif()
 if(EXISTS "${_fw_sdkconfig_file}")
     file(READ "${_fw_sdkconfig_file}" _fw_sdkconfig_text)
     if(_fw_sdkconfig_text MATCHES "CONFIG_APP_PROJECT_VER_FROM_CONFIG=y")
@@ -86,18 +100,122 @@ if(EXISTS "${_fw_sdkconfig_file}")
     endif()
 endif()
 
-# Суффикс платы — по цепочке SDKCONFIG_DEFAULTS: кеш cmake (idf.py -DSDKCONFIG_DEFAULTS=...)
-# или переменная окружения (какие из них заданы — см. tools/cmake/project.cmake IDF)
+# Суффикс платы — по фактической конфигурации сборки (чип + таблица разделов),
+# а не по переданной цепочке SDKCONFIG_DEFAULTS: кнопка Build VS Code
+# переиспользует существующий sdkconfig и не передаёт -DSDKCONFIG_DEFAULTS,
+# а от метки зависят строка версии и OTA-URL (ota_<плата>_sensor_hub.bin).
+# Источники по приоритету:
+#   чип:     -DIDF_TARGET → $ENV{IDF_TARGET} → CONFIG_IDF_TARGET
+#            из sdkconfig, затем из файлов цепочки дефолтов;
+#   таблица: CONFIG_PARTITION_TABLE_CUSTOM_FILENAME из sdkconfig (живой файл
+#            перекрывает дефолты), затем из последнего задавшего её файла
+#            цепочки (пустая цепочка = sdkconfig.defaults);
+#   esp32       + partitions.csv              → «ESP32 4Mb OTA»
+#   esp32c6     + partitions_c6_8mb_ota.csv   → «ESP32-C6 8Mb OTA»
+#   esp32c6     + partitions_c6_4mb_noota.csv → «ESP32-C6 4Mb NoOTA»
+# Неверная комбинация чипа и таблицы — ошибка сборки с подсказкой.
 set(_fw_sdkconfig_defaults "${SDKCONFIG_DEFAULTS}")
 if(NOT _fw_sdkconfig_defaults)
     set(_fw_sdkconfig_defaults "$ENV{SDKCONFIG_DEFAULTS}")
 endif()
-if("${_fw_sdkconfig_defaults}" MATCHES "c6_4mb_noota")
-    set(FW_BOARD_NAME "ESP32-C6 4Mb NoOTA")
-elseif("${_fw_sdkconfig_defaults}" MATCHES "c6_8mb_ota")
-    set(FW_BOARD_NAME "ESP32-C6 8Mb OTA")
+set(_fw_def_chain "")
+if(_fw_sdkconfig_defaults)
+    foreach(_fw_def ${_fw_sdkconfig_defaults})
+        if(NOT IS_ABSOLUTE "${_fw_def}")
+            set(_fw_def "${CMAKE_SOURCE_DIR}/${_fw_def}")
+        endif()
+        list(APPEND _fw_def_chain "${_fw_def}")
+    endforeach()
 else()
-    set(FW_BOARD_NAME "ESP32 4Mb OTA")   # база (partitions.csv, вариант esp32-4mb-ota)
+    list(APPEND _fw_def_chain "${CMAKE_SOURCE_DIR}/sdkconfig.defaults")
+endif()
+
+# Целевой чип
+set(_fw_target "")
+if(IDF_TARGET)
+    set(_fw_target "${IDF_TARGET}")
+elseif(DEFINED ENV{IDF_TARGET} AND NOT "$ENV{IDF_TARGET}" STREQUAL "")
+    set(_fw_target "$ENV{IDF_TARGET}")
+endif()
+
+# Таблица разделов: живой sdkconfig в приоритете, затем файлы цепочки по порядку
+set(_fw_partition "")
+set(_fw_partition_src "")
+if(EXISTS "${_fw_sdkconfig_file}")
+    file(STRINGS "${_fw_sdkconfig_file}" _fw_cfg_list REGEX "^CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=")
+    if(_fw_cfg_list)
+        list(GET _fw_cfg_list 0 _fw_cfg_line)
+        string(REGEX MATCH "\"([^\"]+)\"" _fw_cfg_val "${_fw_cfg_line}")
+        if(CMAKE_MATCH_1)
+            set(_fw_partition "${CMAKE_MATCH_1}")
+            set(_fw_partition_src "sdkconfig")
+        endif()
+    endif()
+endif()
+if(NOT _fw_partition)
+    foreach(_fw_def IN LISTS _fw_def_chain)
+        if(EXISTS "${_fw_def}")
+            file(STRINGS "${_fw_def}" _fw_cfg_list REGEX "^CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=")
+            if(_fw_cfg_list)
+                list(GET _fw_cfg_list 0 _fw_cfg_line)
+                string(REGEX MATCH "\"([^\"]+)\"" _fw_cfg_val "${_fw_cfg_line}")
+                if(CMAKE_MATCH_1)
+                    set(_fw_partition "${CMAKE_MATCH_1}")
+                    set(_fw_partition_src "${_fw_def}")
+                endif()
+            endif()
+        endif()
+    endforeach()
+endif()
+
+# Чип: если не задан явно — из sdkconfig, затем из файлов цепочки дефолтов
+if(NOT _fw_target)
+    foreach(_fw_src "${_fw_sdkconfig_file}" ${_fw_def_chain})
+        if(EXISTS "${_fw_src}")
+            file(STRINGS "${_fw_src}" _fw_cfg_list REGEX "^CONFIG_IDF_TARGET=")
+            if(_fw_cfg_list)
+                list(GET _fw_cfg_list 0 _fw_cfg_line)
+                string(REGEX MATCH "\"([^\"]+)\"" _fw_cfg_val "${_fw_cfg_line}")
+                if(CMAKE_MATCH_1)
+                    set(_fw_target "${CMAKE_MATCH_1}")
+                    break()
+                endif()
+            endif()
+        endif()
+    endforeach()
+endif()
+
+if(NOT _fw_target)
+    message(FATAL_ERROR
+        "Не удалось определить целевой чип прошивки: IDF_TARGET не задан, "
+        "sdkconfig и дефолты не содержат CONFIG_IDF_TARGET. "
+        "Передайте -DIDF_TARGET=esp32 (вариант esp32-4mb-ota) или -DIDF_TARGET=esp32c6 (варианты esp32c6-*).")
+endif()
+
+if(_fw_target STREQUAL "esp32")
+    if(_fw_partition AND NOT "${_fw_partition}" STREQUAL "partitions.csv")
+        message(FATAL_ERROR
+            "Target esp32, но таблица разделов ${_fw_partition} (из ${_fw_partition_src}) — от ESP32-C6. "
+            "sdkconfig от другой цели: удалите sdkconfig, sdkconfig.old и папку build, затем пересоберите "
+            "вариант esp32-4mb-ota (build_firmware.ps1 -Variant esp32-4mb-ota).")
+    endif()
+    set(FW_BOARD_NAME "ESP32 4Mb OTA")
+elseif(_fw_target STREQUAL "esp32c6")
+    if("${_fw_partition}" STREQUAL "partitions_c6_8mb_ota.csv")
+        set(FW_BOARD_NAME "ESP32-C6 8Mb OTA")
+    elseif("${_fw_partition}" STREQUAL "partitions_c6_4mb_noota.csv")
+        set(FW_BOARD_NAME "ESP32-C6 4Mb NoOTA")
+    else()
+        message(FATAL_ERROR
+            "Для target esp32c6 нужен вариант платы: -DSDKCONFIG_DEFAULTS=\"sdkconfig.defaults;sdkconfig.c6_8mb_ota\" "
+            "(«ESP32-C6 8Mb OTA») или -DSDKCONFIG_DEFAULTS=\"sdkconfig.defaults;sdkconfig.c6_4mb_noota\" "
+            "(«ESP32-C6 4Mb NoOTA») — как в .github/workflows/firmware.yml, build_firmware.ps1 и "
+            "idf.sdkconfigDefaults (.vscode/settings.json). Таблица разделов сейчас: "
+            "${_fw_partition} (из ${_fw_partition_src}).")
+    endif()
+else()
+    message(FATAL_ERROR
+        "Неподдерживаемый целевой чип «${_fw_target}»: проект собирается для esp32 и esp32c6.")
 endif()
 
 set(PROJECT_VER "${FW_VERSION} ${FW_BOARD_NAME}")

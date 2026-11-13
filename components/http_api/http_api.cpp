@@ -109,7 +109,6 @@ static std::string s_dl_url;             /* ссылка текущей загр
 static volatile int s_dl_status = 0;
 static volatile int s_dl_progress = -1;
 static char s_dl_err[128] = "";          /* ошибка загрузки для web-интерфейса */
-static uint8_t s_dl_chunk[4096];         /* буфер приёма HTTPS-потока */
 
 static esp_err_t supported_handler(httpd_req_t *req);
 static esp_err_t config_get_handler(httpd_req_t *req);
@@ -628,6 +627,36 @@ static esp_err_t ota_upload_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+/* Runtime-состояние приёма: события esp_http_client приходят синхронно из
+   esp_http_client_perform() в потоке ota_github_task (единственный
+   экземпляр — под s_ota_busy), так что static-поля здесь безопасны. */
+static esp_ota_handle_t s_rt_handle = 0;
+static bool s_rt_open = false;
+static size_t s_rt_received = 0;
+static int64_t s_rt_total = 0;
+
+/* Тело образа: esp_http_client_perform() сам проходит все редиректы
+   (github.com → release-assets.githubusercontent.com); HTTP_EVENT_ON_DATA
+   отдаёт финальное тело чанками — пишем в свободный OTA-слот. */
+static esp_err_t ota_http_event(esp_http_client_event_t *evt) {
+    if (evt->event_id != HTTP_EVENT_ON_DATA) return ESP_OK;
+    const int len = evt->data_len;
+    if (len <= 0 || evt->data == nullptr) return ESP_OK;
+    if (s_rt_total <= 0) s_rt_total = esp_http_client_get_content_length(evt->client);
+    if (!s_rt_open) return ESP_OK;         /* слот ещё не открыт — тело игнорируем */
+    esp_err_t w = esp_ota_write(s_rt_handle, evt->data, len);
+    if (w != ESP_OK) {
+        ESP_LOGE(TAG, "OTA с GitHub: esp_ota_write: %d", w);
+        return w;
+    }
+    s_rt_received += (size_t)len;
+    if (s_rt_total > 0)
+        s_dl_progress = (int)((uint64_t)s_rt_received * 100ULL / (uint64_t)s_rt_total);
+    if (s_rt_received % (256 * 1024) < (size_t)len)
+        ESP_LOGI(TAG, "OTA с GitHub: %u из %lld", (unsigned)s_rt_received, (long long)s_rt_total);
+    return ESP_OK;
+}
+
 /* ------------------------------------------------------------------ */
 /* Обновление с GitHub: POST /api/ota/upgrade запускает фоновое задание,
    которое скачивает bin-образ ночной сборки этой платы
@@ -635,83 +664,100 @@ static esp_err_t ota_upload_handler(httpd_req_t *req) {
    в свободный OTA-слот и перезагружает устройство. Скачивание фоновое,
    т.к. httpd однопоточный и не должен блокироваться на TLS-приёме ~2 МБ;
    статусы — поля dl_* в GET /api/ota (опрашивает web-интерфейс); после
-   перезагрузки состояние dl_* сбрасывается.                            */
+   перезагрузки состояние dl_* сбрасывается. Переход по редиректам делает
+   esp_http_client_perform(); обрыв CDN-потока — до 3 попыток подряд.   */
 /* ------------------------------------------------------------------ */
 static void ota_github_task(void *arg) {
     (void)arg;
     s_dl_progress = 0;
     esp_http_client_config_t cfg = {};
     cfg.url = s_dl_url.c_str();
-    cfg.timeout_ms = 15000;               /* коннект и чтение порции */
-    cfg.buffer_size = 4096;               /* приёмный буфер TLS */
+    cfg.event_handler = ota_http_event;    /* тело образа — через HTTP_EVENT_ON_DATA */
+    cfg.timeout_ms = 15000;                /* коннект, чтение порции, пауза CDN */
+    cfg.buffer_size = 4096;                /* приёмный буфер TLS */
     cfg.buffer_size_tx = 1024;
-    cfg.keep_alive_enable = false;        /* одноразовое соединение */
+    cfg.max_redirection_count = 8;         /* github.com → release-assets (+ запас) */
+    cfg.keep_alive_enable = false;         /* одноразовое соединение */
 #ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
     cfg.crt_bundle_attach = esp_crt_bundle_attach;   /* корневые CA GitHub — шинный пакет mbedtls */
 #endif
-    esp_err_t err = ESP_OK;
-    int64_t total = -1;
-    size_t received = 0;
-    esp_ota_handle_t handle = 0;
-    bool ota_opened = false;
     const esp_partition_t *target = esp_ota_get_next_update_partition(nullptr);
-    esp_http_client_handle_t client = esp_http_client_init(&cfg);
-    if (!client) err = ESP_ERR_NO_MEM;
-    if (err == ESP_OK) err = esp_http_client_open(client, 0);
-    if (err == ESP_OK) {
-        esp_http_client_fetch_headers(client);
-        total = esp_http_client_get_content_length(client);
-        const int code = esp_http_client_get_status_code(client);
-        if (code < 200 || code >= 300) {
-            snprintf(s_dl_err, sizeof(s_dl_err), "HTTP %d от GitHub", code);
-            ESP_LOGE(TAG, "OTA с GitHub: HTTP %d (%s)", code, s_dl_url.c_str());
+    if (!target) {
+        snprintf(s_dl_err, sizeof(s_dl_err), "нет OTA-слота");
+        ESP_LOGE(TAG, "OTA с GitHub: нет OTA-слота");
+        s_dl_status = 3;
+        s_ota_busy = false;
+        vTaskDelete(nullptr);
+        return;
+    }
+    esp_err_t err = ESP_OK;
+    for (int attempt = 1; attempt <= 3; ++attempt) {
+        if (attempt > 1) vTaskDelay(pdMS_TO_TICKS(1000));   /* пауза меж попытками */
+        err = ESP_OK;
+        s_rt_handle = 0; s_rt_open = false; s_rt_received = 0; s_rt_total = 0;
+        esp_ota_handle_t handle = 0;
+        bool ota_opened = false;
+        esp_http_client_handle_t client = esp_http_client_init(&cfg);
+        if (client) {
+            err = esp_ota_begin(target, OTA_SIZE_UNKNOWN, &handle);
+        } else {
+            err = ESP_ERR_NO_MEM;
+        }
+        if (err == ESP_OK) {
+            ota_opened = true;
+            s_rt_handle = handle;
+            s_rt_open = true;              /* обработчик событий начинает писать тело */
+        }
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "OTA с GitHub: скачивание (попытка %d/3)", attempt);
+            err = esp_http_client_perform(client);   /* редиректы 30x — внутри perform() */
+        }
+        const bool complete = (err == ESP_OK) && ota_opened && client &&
+            esp_http_client_is_complete_data_received(client);
+        if (err == ESP_OK) {
+            const int code = esp_http_client_get_status_code(client);
+            if (code < 200 || code >= 300) {
+                snprintf(s_dl_err, sizeof(s_dl_err), "HTTP %d от GitHub", code);
+                ESP_LOGE(TAG, "OTA с GitHub: HTTP %d", code);
+                err = ESP_FAIL;
+            }
+        }
+        if (err == ESP_OK && !complete) {
+            snprintf(s_dl_err, sizeof(s_dl_err), "поток оборван: %u из %lld байт",
+                     (unsigned)s_rt_received, (long long)s_rt_total);
+            ESP_LOGE(TAG, "OTA с GitHub: %s", s_dl_err);
             err = ESP_FAIL;
         }
-    }
-    if (err == ESP_OK && !target) err = ESP_ERR_NOT_SUPPORTED;
-    if (err == ESP_OK) err = esp_ota_begin(target, OTA_SIZE_UNKNOWN, &handle);
-    if (err == ESP_OK) ota_opened = true;
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "OTA с GitHub: скачивание %s", s_dl_url.c_str());
-        while (true) {
-            const int r = esp_http_client_read(client, (char *)s_dl_chunk, sizeof(s_dl_chunk));
-            if (r < 0) { err = ESP_FAIL; break; }         /* соединение оборвалось */
-            if (r == 0) {                                 /* потока больше нет */
-                if (esp_http_client_is_complete_data_received(client)) break;
-                err = ESP_FAIL;                           /* закрылся раньше объёма — образ неполный */
-                break;
-            }
-            err = esp_ota_write(handle, s_dl_chunk, r);
-            if (err != ESP_OK) break;
-            received += (size_t)r;
-            if (total > 0) s_dl_progress = (int)((uint64_t)received * 100ULL / (uint64_t)total);
-            if (received % (256 * 1024) < (size_t)r)      /* прогресс каждые ~256 КБ в журнал */
-                ESP_LOGI(TAG, "OTA с GitHub: %u из %d", (unsigned)received, (int)total);
+        if (err == ESP_OK && s_rt_received < 64) err = ESP_ERR_INVALID_SIZE;
+        if (err == ESP_OK) {
+            err = esp_ota_end(handle);     /* проверяет magic/размер/хеш образа */
+            ota_opened = false;            /* хендл закрыт (успех или финальная ошибка) */
+            s_rt_open = false;
         }
-    }
-    if (err == ESP_OK && received < 64)
-        err = ESP_ERR_INVALID_SIZE;       /* короче заголовка образа — не прошивка */
-    if (err == ESP_OK)
-        err = esp_ota_end(handle);        /* проверяет magic/размер/хеш образа */
-    else if (ota_opened && handle)
-        esp_ota_abort(handle);
-    if (err == ESP_OK && target)
-        err = esp_ota_set_boot_partition(target);
-    if (client) {
-        esp_http_client_close(client);
         esp_http_client_cleanup(client);
+        if (err == ESP_OK) {
+            err = esp_ota_set_boot_partition(target);
+        } else if (ota_opened && handle) {
+            esp_ota_abort(handle);
+        }
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "OTA с GitHub ок: %u байт в '%s'", (unsigned)s_rt_received, target->label);
+            break;                         /* успех — дальнейшие попытки не нужны */
+        }
+        s_dl_progress = 0;                 /* полоса UI — на начало следующей попытки */
+        snprintf(s_dl_err, sizeof(s_dl_err), "попытка %d/3: %s (%u байт)",
+                 attempt, esp_err_to_name(err), (unsigned)s_rt_received);
+        ESP_LOGE(TAG, "OTA с GitHub неудачно: %s", s_dl_err);
     }
     if (err == ESP_OK) {
         s_dl_progress = 100;
-        s_dl_status = 2;                  /* ок — браузер видит успех и ждёт перезагрузку */
-        ESP_LOGI(TAG, "OTA с GitHub ок: %u байт в '%s', перезагрузка", (unsigned)received, target->label);
-        vTaskDelay(pdMS_TO_TICKS(2000));  /* дать браузеру увидеть dl_status=2 */
+        s_dl_status = 2;                   /* ок — браузер видит успех и ждёт перезагрузку */
+        ESP_LOGI(TAG, "OTA с GitHub: перезагрузка");
+        vTaskDelay(pdMS_TO_TICKS(2000));   /* дать браузеру увидеть dl_status=2 */
         esp_restart();
     }
-    if (!s_dl_err[0]) snprintf(s_dl_err, sizeof(s_dl_err), "%s", esp_err_to_name(err));
-    ESP_LOGE(TAG, "OTA с GitHub неудачно: %s (%u байт)", s_dl_err, (unsigned)received);
     s_dl_status = 3;
-    s_ota_busy = false;                   /* можно повторить попытку */
+    s_ota_busy = false;                    /* можно повторить попытку */
     vTaskDelete(nullptr);
 }
 
