@@ -186,6 +186,8 @@ jobs:
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
+      # gh вне git-репозитория не может определить owner/repo — задаём явно
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Скачивание артефактов
         uses: actions/download-artifact@v4
@@ -232,7 +234,7 @@ jobs:
           echo "Ночной релиз обновлён: https://github.com/${GITHUB_REPOSITORY}/releases/tag/nightly"
 
   release-versioned:
-    name: Релиз v${{ github.event.inputs.release_number }}
+    name: Релиз с номером
     needs: build
     # только ручной запуск с указанным номером релиза
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_number != ''
@@ -240,6 +242,8 @@ jobs:
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
+      # gh вне git-репозитория не может определить owner/repo — задаём явно
+      GH_REPO: ${{ github.repository }}
       RELEASE_NUMBER: ${{ github.event.inputs.release_number }}
     steps:
       - name: Скачивание артефактов
