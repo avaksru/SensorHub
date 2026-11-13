@@ -1,0 +1,283 @@
+# Сборка прошивки SensorHub и публикация релизов.
+#
+# Триггеры:
+#   push в main                                     — сборка 3 вариантов платы +
+#                                                     обновление «Ночного релиза»
+#                                                     (rolling prerelease, тег nightly).
+#   Actions -> "SensorHub firmware" -> Run workflow — ручной запуск:
+#     * указан Номер релиза      -> создаётся полноценный релиз v<номер>
+#                                   (тег v<номер> от текущего коммита);
+#     * номер релиза не указан   -> обновляется «Ночной релиз».
+#
+# Артефакты (5 bin-файлов):
+#   marged_ESP32-C6_4mb_sensor_hub.bin  — ESP32-C6, flash 4 МБ, без OTA: merged-образ
+#                                         целиком; прошивка через
+#                                         https://espressif.github.io/esptool-js/
+#                                         (выбрать файл, Flash Address = 0x0);
+#   marged_ESP32-C6_8mb_sensor_hub.bin  — ESP32-C6, flash 8 МБ, OTA: merged, адрес 0x0;
+#   ota_ESP32-C6_8mb_sensor_hub.bin     — образ приложения для OTA-обновления
+#                                         через веб-интерфейс (вкладка «Система»);
+#   marged_ESP32_4mb_sensor_hub.bin     — ESP32, flash 4 МБ, OTA: merged, адрес 0x0;
+#   ota_ESP32_4mb_sensor_hub.bin        — образ приложения для OTA-обновления.
+#
+# Варианты сборки и наборы sdkconfig — как в build_firmware.ps1:
+#   esp32-4mb-ota      ESP32,    4 МБ, partitions.csv
+#   esp32c6-4mb-noota  ESP32-C6, 4 МБ, partitions_c6_4mb_noota.csv (без OTA)
+#   esp32c6-8mb-ota    ESP32-C6, 8 МБ, partitions_c6_8mb_ota.csv
+#
+# esp-iot-solution пинится на конкретный коммит: локальные кастомные коммиты
+# трогают только examples/sensors/dynamic_config_sensor_hub, а компоненты
+# i2c_bus / bme280 / aht20 / sht3x / ntc_driver относительно этого коммита
+# upstream не менялись. Новый pin:
+#   git -C C:\GitHub\AVAKS\esp-iot-solution\esp-iot-solution rev-parse origin/master
+
+name: SensorHub firmware
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      release_number:
+        description: 'Номер релиза (создать релиз v<номер>; пусто — обновить ночной релиз)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: firmware-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+env:
+  # Ревизия esp-iot-solution для сборки (upstream master на момент локальной
+  # сборки; diff merge-base..HEAD по используемым компонентам пуст)
+  IOT_SOLUTION_REF: 5fbb2597b88f21ec41e952f81292ccd6ae569761
+
+jobs:
+  build:
+    name: Сборка ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      # Точная версия окружения локальной разработки (C:\esp\v6.1\esp-idf == тег v6.1)
+      image: espressif/idf:v6.1
+      options: --user root
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: esp32-4mb-ota
+            target: esp32
+            defaults: sdkconfig.defaults
+            merged_name: marged_ESP32_4mb_sensor_hub.bin
+            ota_name: ota_ESP32_4mb_sensor_hub.bin
+          - name: esp32c6-4mb-noota
+            target: esp32c6
+            defaults: "sdkconfig.defaults;sdkconfig.c6_4mb_noota"
+            merged_name: marged_ESP32-C6_4mb_sensor_hub.bin
+            ota_name: ''
+          - name: esp32c6-8mb-ota
+            target: esp32c6
+            defaults: "sdkconfig.defaults;sdkconfig.c6_8mb_ota"
+            merged_name: marged_ESP32-C6_8mb_sensor_hub.bin
+            ota_name: ota_ESP32-C6_8mb_sensor_hub.bin
+
+    env:
+      VARIANT: ${{ matrix.name }}
+      TARGET: ${{ matrix.target }}
+      DEFAULTS: ${{ matrix.defaults }}
+      BUILD_DIR: build_${{ matrix.name }}
+      MERGED_NAME: ${{ matrix.merged_name }}
+      OTA_NAME: ${{ matrix.ota_name }}
+      IOT_SOLUTION_PATH: ${{ github.workspace }}/esp-iot-solution
+
+    steps:
+      - name: Checkout SensorHub
+        uses: actions/checkout@v4
+
+      - name: Checkout esp-iot-solution (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: espressif/esp-iot-solution
+          ref: ${{ env.IOT_SOLUTION_REF }}
+          path: esp-iot-solution
+
+      - name: Сборка прошивки
+        shell: bash
+        run: |
+          git config --global --add safe.directory '*'
+          . "$IDF_PATH/export.sh"
+          idf.py -B "$BUILD_DIR" -DIDF_TARGET="$TARGET" -DSDKCONFIG_DEFAULTS="$DEFAULTS" build
+
+      - name: Сборка bin-файлов (merged + OTA)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, shutil, subprocess, sys
+
+          build = os.environ["BUILD_DIR"]
+          dist = "dist"
+          os.makedirs(dist, exist_ok=True)
+
+          with open(os.path.join(build, "flasher_args.json"), encoding="utf-8") as f:
+              fa = json.load(f)
+
+          chip = fa["extra_esptool_args"]["chip"]
+          s = fa["flash_settings"]
+          files = fa["flash_files"]
+
+          merged = os.path.join(dist, os.environ["MERGED_NAME"])
+          cmd = [sys.executable, "-m", "esptool", "--chip", chip, "merge-bin",
+                 "-o", merged]
+          if s.get("flash_mode"):
+              cmd += ["--flash-mode", s["flash_mode"]]
+          if s.get("flash_freq"):
+              cmd += ["--flash-freq", s["flash_freq"]]
+          if s.get("flash_size"):
+              cmd += ["--flash-size", s["flash_size"]]
+
+          # Классический ESP32: загрузчик лежит с 0x1000. Добавляем заполнитель 0x0,
+          # чтобы merged-файл начинался с адреса 0x0 и прошивался через esptool-js
+          # с Flash Address = 0x0. У ESP32-C6 загрузчик уже с 0x0.
+          if "0x0" not in files:
+              with open("pad_head.bin", "wb") as pf:
+                  pf.write(b"\xff" * 64)
+              cmd += ["0x0", "pad_head.bin"]
+
+          for off in sorted(files, key=lambda x: int(x, 16)):
+              cmd += [off, os.path.join(build, files[off])]
+
+          print("+ " + " ".join(cmd))
+          subprocess.run(cmd, check=True)
+
+          ota = os.environ.get("OTA_NAME") or ""
+          if ota:
+              shutil.copyfile(os.path.join(build, fa["app"]["file"]),
+                              os.path.join(dist, ota))
+
+          print("Артефакты:")
+          for n in sorted(os.listdir(dist)):
+              print("  %s: %d байт" % (n, os.path.getsize(os.path.join(dist, n))))
+          PY
+
+      - name: Выгрузка артефакта
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release-nightly:
+    name: Ночной релиз
+    needs: build
+    # push в main, либо ручной запуск без номера релиза
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.release_number == '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Скачивание артефактов
+        uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-*
+          merge-multiple: true
+          path: dist
+
+      - name: Пересоздание релиза nightly
+        shell: bash
+        run: |
+          DATE=$(date -u '+%Y-%m-%d %H:%M UTC')
+          SHORT=${GITHUB_SHA::7}
+
+          cat > notes.md <<EOF
+          **Автоматическая ночная сборка** — коммит ${SHORT}, ${DATE}.
+
+          Прошивка по USB через [esptool-js](https://espressif.github.io/esptool-js/):
+          подключить плату, выбрать marged_*.bin, указать Flash Address = **0x0**:
+
+          - marged_ESP32-C6_4mb_sensor_hub.bin — ESP32-C6, flash 4 МБ (без OTA)
+          - marged_ESP32-C6_8mb_sensor_hub.bin — ESP32-C6, flash 8 МБ (с OTA)
+          - marged_ESP32_4mb_sensor_hub.bin — ESP32, flash 4 МБ (с OTA)
+
+          OTA-обновление через веб-интерфейс устройства (вкладка «Система»):
+
+          - ota_ESP32-C6_8mb_sensor_hub.bin — ESP32-C6, flash 8 МБ
+          - ota_ESP32_4mb_sensor_hub.bin — ESP32, flash 4 МБ
+          EOF
+
+          # Ночной релиз rolling: тег и релиз пересоздаются от текущего коммита,
+          # чтобы bin-файлы всегда соответствовали последнему коммиту main.
+          # Ссылки вида releases/download/nightly/<файл> остаются валидными.
+          gh release delete nightly --yes --cleanup-tag > /dev/null 2>&1 || true
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/nightly" > /dev/null 2>&1 || true
+
+          gh release create nightly \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Ночной релиз — ${DATE} (${SHORT})" \
+            --notes-file notes.md \
+            dist/*
+
+          echo "Ночной релиз обновлён: https://github.com/${GITHUB_REPOSITORY}/releases/tag/nightly"
+
+  release-versioned:
+    name: Релиз v${{ github.event.inputs.release_number }}
+    needs: build
+    # только ручной запуск с указанным номером релиза
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_number != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_NUMBER: ${{ github.event.inputs.release_number }}
+    steps:
+      - name: Скачивание артефактов
+        uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-*
+          merge-multiple: true
+          path: dist
+
+      - name: Создание релиза
+        shell: bash
+        run: |
+          TAG="v${RELEASE_NUMBER}"
+          SHORT=${GITHUB_SHA::7}
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Ошибка: релиз ${TAG} уже существует. Укажите другой номер." >&2
+            exit 1
+          fi
+
+          cat > notes.md <<EOF
+          **Релиз SensorHub ${TAG}** — коммит ${SHORT}.
+
+          Прошивка по USB через [esptool-js](https://espressif.github.io/esptool-js/):
+          подключить плату, выбрать marged_*.bin, указать Flash Address = **0x0**:
+
+          - marged_ESP32-C6_4mb_sensor_hub.bin — ESP32-C6, flash 4 МБ (без OTA)
+          - marged_ESP32-C6_8mb_sensor_hub.bin — ESP32-C6, flash 8 МБ (с OTA)
+          - marged_ESP32_4mb_sensor_hub.bin — ESP32, flash 4 МБ (с OTA)
+
+          OTA-обновление через веб-интерфейс устройства (вкладка «Система»):
+
+          - ota_ESP32-C6_8mb_sensor_hub.bin — ESP32-C6, flash 8 МБ
+          - ota_ESP32_4mb_sensor_hub.bin — ESP32, flash 4 МБ
+          EOF
+
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "SensorHub ${TAG}" \
+            --notes-file notes.md \
+            dist/*
+
+          echo "Релиз создан: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+
+
+
