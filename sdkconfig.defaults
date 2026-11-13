@@ -1,0 +1,32 @@
+# База всех сборок; локальная разработка по умолчанию: partitions.csv —
+# ESP32 4 МБ + два OTA-слота по 1.5 МБ, обновление прошивки через web (POST /api/ota).
+# Варианты CI добавляются списком SDKCONFIG_DEFAULTS (см. .github/workflows/firmware.yml):
+#   sdkconfig.c6_4mb_noota — ESP32-C6, 4 МБ без OTA (factory 3.44 МБ, без coredump)
+#   sdkconfig.c6_8mb_ota   — ESP32-C6, 8 МБ с OTA-слотами по 3 МБ
+# Порядок списка важен: файлы после базы переопределяют таблицу разделов и размер flash.
+# Версия прошивки в app desc (вкладка «Система», поле «Версия») вместо git-хеша —
+# обозначение целевой платы: база (partitions.csv) = ESP32 4Mb OTA; два варианта
+# ESP32-C6 переопределяют строку на ESP32-C6 4Mb NoOTA / ESP32-C6 8Mb OTA.
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="ESP32 4Mb OTA"
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_COMPILER_CXX_EXCEPTIONS=y
+CONFIG_FREERTOS_HZ=100
+# -Os: прошивка на грани слота OTA (1.5 МБ) — выгрыш ~200 КБ
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+# Общий пул lwIP-сокетов: httpd (listen + ctrl + keep-alive сессии), MQTT и SNTP
+# живут в нём совместно. Малый пул (дефолт 10) даёт периодические ошибки
+# "httpd_accept_conn: error in accept (23)" (ENFILE) при всплесках параллельных
+# соединений браузера: таймеры web-интерфейса 2с/5с/5с периодически совпадают.
+CONFIG_LWIP_MAX_SOCKETS=16
+# WebSocket в esp_http_server: поток serial-лога GET /api/log/ws — браузер
+# сам опрашивает устройство пустыми кадрами (httpd однопоточный, pull-модель),
+# строки дублируются в консоль браузера (console.log/warn/error).
+CONFIG_HTTPD_WS_SUPPORT=y
+# Загрузка CPU для вкладки «Система» (/api/system): счетчики run-time времени
+# задач дают долю idle (загрузка = 100 % минус idle). Оверхед — чтение счетчика
+# циклов при каждом переключении задач, незначительно.
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y

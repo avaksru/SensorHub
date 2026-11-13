@@ -1,0 +1,13 @@
+# Name,     Type, SubType,  Offset,   Size,     Flags
+# 4 МБ flash + OTA (обновление через web: POST /api/ota)
+# NVS/PHY не двигались — настройки WiFi/MQTT/времени сохраняются.
+# ota_0 (0x20000..0x1A0000) и ota_1 (0x1A0000..0x320000): слоты по 1.5 МБ.
+# storage — littlefs (скрипты Lua), coredump — дамп при панике.
+nvs,        data, nvs,      0x9000,   0x6000,
+phy_init,   data, phy,      0xf000,   0x1000,
+otadata,    data, ota,      0x10000,  0x2000,
+ota_0,      app,  ota_0,    0x20000,  0x180000,
+ota_1,      app,  ota_1,    0x1a0000, 0x180000,
+storage,    data, littlefs, 0x320000, 0x80000,
+coredump,   data, coredump, 0x3a0000, 0x60000,
+

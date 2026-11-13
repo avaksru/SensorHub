@@ -1,0 +1,11 @@
+# Вариант CI: ESP32-C6, 4 МБ flash, БЕЗ OTA-разделов.
+# Таблица: partitions_c6_4mb_noota.csv — factory 3.44 МБ на все доступное место
+# после NVS/PHY + storage (littlefs) 512 КБ; coredump отсутствует.
+# Web-интерфейс: на вкладке «Система» блок OTA скрыт (GET /api/ota: available=false).
+# В CI: idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.c6_4mb_noota"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_c6_4mb_noota.csv"
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+# Версия прошивки в app desc (вкладка «Система»): целевая плата — ESP32-C6,
+# 4 МБ flash, БЕЗ OTA. Переопределяет строку из sdkconfig.defaults (esp32-4mb-ota).
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="ESP32-C6 4Mb NoOTA"

@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sensor Hub</title>
+<script>document.documentElement.dataset.theme=localStorage.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:light;--bg:#f2f5f9;--cd:#fff;--cdt:#ffffffd9;--in:#f6f8fb;--tx:#151b26;--mu:#6a7686;--ln:#e3e8ef;--ac:#5658f2;--ac2:#8b5cf6;--acc:#5658f22b;--gl:#5658f266;--ok:#16a34a;--okc:#16a34a4d;--no:#e5484d;--sh:0 1px 2px #17233408,0 10px 30px -14px #1723342b}
+html[data-theme=dark]{color-scheme:dark;--bg:#0d1017;--cd:#151a23;--cdt:#151a23d9;--in:#10151d;--tx:#e8ecf2;--mu:#8a95a5;--ln:#262e3b;--ac:#8385ff;--ac2:#a78bfa;--acc:#8385ff2e;--gl:#8385ff59;--ok:#34d399;--okc:#34d3994d;--no:#f87171;--sh:0 10px 30px -12px #0000008c}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--tx);-webkit-tap-highlight-color:transparent}
+header{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--cdt);backdrop-filter:blur(12px);border-bottom:1px solid var(--ln)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px}
+.brand i{width:11px;height:11px;border-radius:50%;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 0 12px var(--gl)}
+.chip{display:inline-flex;align-items:center;gap:8px;margin-left:auto;padding:6px 12px;border:1px solid var(--ln);border-radius:99px;background:var(--in);font-size:.78rem;color:var(--mu);max-width:56vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--no);transition:background .3s}
+.dot.ok{background:var(--ok);animation:pu 2.4s infinite}
+@keyframes pu{0%{box-shadow:0 0 0 0 var(--okc)}70%,100%{box-shadow:0 0 0 7px #0000}}
+.ib{flex:none;width:38px;height:38px;margin-left:4px;border:1px solid var(--ln);border-radius:11px;background:var(--in);color:var(--mu);font-size:17px;cursor:pointer;transition:.15s}
+.ib:hover{color:var(--ac);transform:scale(1.06)}
+nav{display:flex;gap:6px;max-width:960px;margin:0 auto;padding:10px 18px 0}
+nav button{flex:0 0 auto;padding:9px 15px;border:0;border-radius:11px;background:0;color:var(--mu);font:inherit;font-weight:600;cursor:pointer;transition:.15s}
+nav button:hover{color:var(--tx)}
+nav button.on{background:var(--cd);color:var(--ac);box-shadow:var(--sh)}
+main{max-width:960px;margin:0 auto;padding:16px 18px 44px;display:grid;gap:16px}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}
+.panel{display:none}.panel.on{display:grid;gap:16px;animation:in .25s}
+.card h2{margin:0 0 14px;font-size:1rem;display:flex;align-items:center;justify-content:space-between;gap:8px}
+/* статус в строке заголовка карточки (WiFi/MQTT): точка состояния + краткий текст */
+.card h2 .hs{display:flex;align-items:center;gap:7px;min-width:0;font-size:.78rem;font-weight:400;color:var(--mu)}
+.cols{display:grid;gap:16px;grid-template-columns:1fr 1fr;align-items:start}
+/* Единая панель Lua: один каталог /littlefs/scripts, тип файла — по хукам */
+#p-scripts .cols{grid-template-columns:170px 738px;justify-content:start}
+/* бейдж хуков файла (U = on_update, FX = on_frame, U+FX = гибрид): в списке (.tg) и в заголовке редактора (.tag) */
+.tg{flex:none;display:inline-block;margin-right:7px;padding:0 5px;border-radius:6px;font-size:.68rem;font-weight:700;line-height:1.45;vertical-align:1px}
+.tg.s{background:var(--acc);color:var(--ac)}
+.tg.f{background:var(--ac2);color:#fff}
+.tg.h{background:#9d5cff;color:#fff}
+.tag{flex:none;margin-left:8px;padding:2px 8px;border-radius:7px;font-size:.68rem;font-weight:700}
+.tag.s{background:var(--acc);color:var(--ac)}
+.tag.f{background:var(--ac2);color:#fff}
+.tag.h{background:#9d5cff;color:#fff}
+.empty.sm{padding:4px 12px;font-size:.8rem}
+/* мини-табы справочника внутри details */
+.rtabs{display:flex;gap:6px;margin-top:10px}
+.rtabs button{flex:0 0 auto;padding:5px 11px;border:1px solid var(--ln);border-radius:9px;background:var(--in);color:var(--mu);font:inherit;font-size:.75rem;font-weight:600;cursor:pointer;transition:.15s}
+.rtabs button:hover{color:var(--tx)}
+.rtabs button.on{border-color:var(--ac);color:var(--ac);background:var(--cd)}
+.f{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.f label{display:grid;gap:5px;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mu)}
+.f .w,.f label.sw{grid-column:1/-1}
+input,select{width:100%;min-height:42px;padding:0 12px;border:1px solid var(--ln);border-radius:11px;background:var(--in);color:var(--tx);font:inherit;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px var(--acc)}
+.f label.sw{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.9rem;font-weight:600;color:var(--tx);text-transform:none;letter-spacing:0;cursor:pointer}
+.sw input{position:absolute;width:0;height:0;opacity:0}
+.tk{flex:none;width:44px;height:26px;border-radius:99px;background:var(--ln);position:relative;transition:.2s}
+.tk::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0004;transition:.2s}
+.sw input:checked+.tk{background:var(--ac)}
+.sw input:checked+.tk::after{left:21px}
+.sw input:focus-visible+.tk{box-shadow:0 0 0 3px var(--acc)}
+.act{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.b{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:0 18px;border:0;border-radius:11px;font:inherit;font-weight:600;color:#fff;cursor:pointer;background:linear-gradient(135deg,var(--ac),var(--ac2));transition:.15s}
+.b:hover{filter:brightness(1.08)}
+.b:active{transform:scale(.97)}
+.b.gh{background:var(--in);color:var(--tx);border:1px solid var(--ln);box-shadow:none}
+.b.gh:hover{border-color:var(--ac);color:var(--ac);filter:none}
+.b.no{background:var(--no)}
+.b.no.gh{color:var(--no);background:var(--in)}
+.b.no.gh:hover{border-color:var(--no)}
+.lst{display:grid;gap:8px}
+.it{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border:1px solid var(--ln);border-radius:12px;background:var(--in);transition:.15s}
+.it:hover{border-color:var(--ac)}
+.dot.warn{background:#f59e0b;box-shadow:0 0 10px #f59e0b4d}
+.nm{font-weight:600}
+.me{font-size:.78rem;color:var(--mu);margin-top:2px}
+.del{flex:none;width:34px;height:34px;border:0;border-radius:9px;background:0;color:var(--mu);font-size:15px;cursor:pointer;transition:.15s}
+.del:hover{color:#fff;background:var(--no)}
+.edt{flex:none;width:34px;height:34px;border:0;border-radius:9px;background:0;color:var(--mu);font-size:15px;cursor:pointer;transition:.15s}
+.edt:hover{color:#fff;background:var(--ac)}
+.ctl{flex:none;padding:4px 12px;border:1px solid var(--ln);border-radius:99px;background:var(--in);color:var(--mu);font:700 .72rem system-ui,sans-serif;cursor:pointer;transition:.15s}
+.ctl:hover{color:var(--ac);border-color:var(--ac)}
+.ctl.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.btns{flex:none;display:flex;gap:6px}
+.empty{text-align:center;color:var(--mu);padding:24px 8px;font-size:.9rem}
+.st{display:flex;align-items:center;gap:9px;margin-top:14px;padding:10px 14px;border:1px solid var(--ln);border-radius:12px;background:var(--in);font-size:.85rem;color:var(--mu)}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pu 1.8s infinite}
+/* Единые карточки датчиков: страница «Данные» объединена со страницей «Сенсоры»,
+   заголовок карточки = id + тумблер PIN + кнопки правки/удаления */
+.tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.tile{background:var(--in);border:1px solid var(--ln);border-radius:14px;padding:12px}
+.tile h4{margin:0 0 4px;font-size:.9rem;display:flex;align-items:center;gap:6px}
+.tile h4 .nm{margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile .btns{gap:2px}
+.tile .edt,.tile .del{width:30px;height:30px;font-size:13px}
+.tile.editing{border-color:var(--ac)!important}
+.tile.off{opacity:.6}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:.88rem}
+.kv span{color:var(--mu)}
+.kv span[data-u]{cursor:pointer;border-bottom:1px dashed var(--ln)}
+.kv span[data-u]:hover{color:var(--ac)}
+.kv b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* порядок атрибутов на карточке: кнопка «⇑» — показать атрибут первым */
+.kv .ord{border:0;background:none;padding:0 0 0 7px;color:var(--mu);cursor:pointer;font-size:.82rem;font-weight:400}
+.kv .ord:hover{color:var(--ac)}
+/* виртуальный элемент «поле ввода» (INPUT): значение переменной правится на карточке */
+.vinrow{max-width:100%}
+.vin{flex:1;min-width:0;font-size:.88rem;color:var(--tx);background:var(--cd);padding:5px 9px;border-radius:8px}
+.vin::placeholder{color:var(--mu)}
+.vset{flex:none;border:1px solid var(--ln);border-radius:8px;background:var(--cd);color:var(--ac);font-size:.8rem;padding:4px 9px;cursor:pointer;transition:.15s}
+.vset:hover{border-color:var(--ac)}
+canvas{display:block;width:100%;height:36px;margin-top:8px}
+/* Всплывающая форма «Добавить датчик / Редактирование»: по умолчанию скрыта,
+   открывается поверх карточек; закрытие — кнопка ✕, Отмена, Esc, клик по фону */
+.modal{display:none;position:fixed;inset:0;z-index:60;overflow:auto;padding:20px 18px;background:rgba(13,17,26,.5)}
+.modal.on{display:flex}
+.mcard{margin:auto;width:100%;max-width:640px;background:var(--cd);border:1px solid var(--ln);border-radius:16px;padding:18px 20px 20px;box-shadow:var(--sh);animation:in .2s}
+.mhd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.mhd h2{margin:0;font-size:1rem}
+.mhd .ib{margin:0}
+.b.sml{min-height:34px;padding:0 14px;font-size:.85rem}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,14px);padding:11px 18px;border:1px solid var(--ln);border-radius:12px;background:var(--cd);color:var(--tx);font-weight:600;font-size:.9rem;box-shadow:var(--sh);opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:92vw}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+textarea.ed{width:100%;min-height:340px;padding:10px;border:1px solid var(--ln);border-radius:11px;background:var(--in);color:var(--tx);font:13px/1.5 Consolas,'Cascadia Code',Menlo,monospace;resize:vertical;tab-size:4}
+textarea.ed:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px var(--acc)}
+/* Онлайн-редактор (CodeMirror с CDN): оформление под текущую тему. Пока библиотека
+   не загружена (нет интернета) действует обычный textarea.ed — стили выше. */
+div.CodeMirror{height:auto;min-height:340px;border:1px solid var(--ln);border-radius:11px;background:var(--in);color:var(--tx);font:13px/1.55 Consolas,'Cascadia Code',Menlo,monospace}
+div.CodeMirror-scroll{min-height:340px;max-height:72vh}
+div.CodeMirror-focused{border-color:var(--ac);box-shadow:0 0 0 3px var(--acc)}
+div.CodeMirror .CodeMirror-gutters{background:var(--in);border-right:1px solid var(--ln)}
+div.CodeMirror .CodeMirror-linenumber{color:var(--mu)}
+div.CodeMirror .CodeMirror-cursor{border-left:1.5px solid var(--ac)}
+div.CodeMirror .CodeMirror-selected{background:var(--gl)}
+div.CodeMirror pre.CodeMirror-cursor{border-left:1.5px solid var(--ac)}
+.cm-s-ed .cm-keyword{color:var(--ac2);font-weight:600}
+.cm-s-ed .cm-builtin{color:var(--ac)}
+.cm-s-ed .cm-string{color:var(--ok)}
+.cm-s-ed .cm-comment{color:var(--mu);font-style:italic}
+.cm-s-ed .cm-number{color:#b06a1e}
+html[data-theme=dark] .cm-s-ed .cm-number{color:#d9a05f}
+.cm-err{background:#e5484d26;box-shadow:inset 2px 0 0 #e5484db3}
+.it.sel{border-color:var(--ac)!important}
+.mu{color:var(--mu);font-weight:400;font-size:.8rem;font-family:Consolas,monospace}
+.ref{font-size:.78rem;line-height:1.55;color:var(--mu);columns:2;column-gap:20px;margin-top:10px}
+.ref b{color:var(--tx);font-family:Consolas,monospace;font-weight:600;white-space:nowrap}
+.ref i{font-style:normal;font-family:Consolas,monospace;opacity:.8}
+.ref div{break-inside:avoid;margin-bottom:4px}
+.warn{color:var(--no);font-size:.78rem}
+.pbar{height:12px;border-radius:99px;background:var(--in);border:1px solid var(--ln);overflow:hidden;margin-top:14px}
+.pbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .25s}
+.pbar i.hi{background:var(--no)}
+/* «Система»: мониторинг — три блока с полосами (CPU / ОЗУ / storage) */
+.sys{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.sysbk{background:var(--in);border:1px solid var(--ln);border-radius:12px;padding:12px}
+.sysh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:.85rem;font-weight:600}
+.sysh b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.sysbk .pbar{margin-top:10px}
+.sysbk .me{margin-top:8px}
+@media(max-width:660px){.sys{grid-template-columns:1fr}}
+@media(max-width:660px){.cols,.f{grid-template-columns:1fr}header,nav{padding-left:14px;padding-right:14px}nav{padding-top:8px}nav button{flex:1;padding:9px 6px}main{padding:14px 14px 30px}.chip{font-size:.72rem}.ref{columns:1}}
+@media(max-width:1011px){#p-scripts .cols{grid-template-columns:1fr 1fr}}
+@media(max-width:660px){#p-scripts .cols{grid-template-columns:1fr}}
+/* Баннер «нет связи с контроллером» — включает heartBeat(), когда /api/time недоступен:
+   опросы статусов при этом молча возвращают null, на странице остаются предыдущие
+   данные, поэтому предупреждаем наверху и гасим цветные точки статусов */
+#nwarn{display:none;padding:12px 16px;border:1px solid var(--no);border-radius:12px;background:var(--in);color:var(--no);font-weight:600;align-items:center;gap:12px;flex-wrap:wrap}
+#nwarn.on{display:flex}
+#nwarn .b{min-height:34px;padding:0 14px;font-size:.85rem;margin-left:auto}
+/* на вкладке «Сенсоры» во время потери связи бейдж live и карточки затемняются */
+body.net-off .live{filter:grayscale(1);opacity:.4}
+body.net-off #tiles{opacity:.55}
+/* Подсказка о смене адреса: страницу открыли с AP (192.168.4.1), а контроллер
+   получил IP по DHCP от роутера — AP закроется через несколько секунд */
+.ipsw{display:none;margin-top:10px;padding:11px 14px;border:1px solid var(--ac);border-radius:12px;background:var(--in);font-size:.9rem;line-height:1.5}
+.ipsw.on{display:block}
+.ipsw a{color:var(--ac);font-weight:700}
+.ipsw .mu{margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><i></i>Sensor Hub</div>
+  <div class="chip"><span class="dot" id="hd"></span><span id="chip">—</span></div>
+  <button class="ib" id="ti" title="Сменить тему">☾</button>
+</header>
+<nav id="tabs">
+  <button data-t="sensors" class="on">Сенсоры</button>
+  <button data-t="scripts">Скрипты</button>
+  <button data-t="conn">Подключение</button>
+  <button data-t="ota">Система</button>
+</nav>
+<main>
+  <div id="nwarn"><span>⚠ Контроллер не отвечает — устройство выключено, перезагружается или недоступно в сети. Статусы и данные на странице устарели.</span><button class="b gh" id="nrel" title="Перезагрузить страницу и проверить связь заново">Обновить страницу</button></div>
+  <section id="p-sensors" class="panel on">
+    <article class="card">
+      <h2><span>Датчики</span><span class="hs"><button class="b sml" id="sopen">＋ Добавить датчик</button><span class="live"><i></i>live</span></span></h2>
+      <div class="me">Клик по названию параметра — задать единицы измерения (°C, %, kPa…) · ✎ — правка, ✕ — удаление (изменения сохраняются на устройстве сразу)</div>
+      <div id="tiles" class="tiles"></div>
+    </article>
+    <article class="card">
+      <h2>Резервная копия (сенсоры + скрипты)</h2>
+      <div class="me">Один JSON-файл: текущая настройка сенсоров и содержимое всех Lua-скриптов. Импорт перезаписывает сенсоры и синхронизирует набор скриптов с файлом (лишние на устройстве будут удалены). WiFi/MQTT-пароли в файл не входят.</div>
+      <div class="act">
+        <button class="b" id="bkexp">Экспорт</button>
+        <button class="b gh" id="bkimp">Импорт из файла…</button>
+        <input id="bkfin" type="file" accept=".json,application/json" style="display:none">
+        <span id="bkstat" class="mu" style="align-self:center"></span>
+      </div>
+    </article>
+  </section>
+  <section id="p-conn" class="panel">
+    <div class="cols">
+      <article class="card">
+        <h2><span>WiFi</span><span class="hs"><span class="dot" id="wd"></span><span id="wst">…</span></span></h2>
+        <div id="ipsw" class="ipsw"><div><b>Контроллер подключён к роутеру — новый адрес: <a id="ipswurl" target="_blank" rel="noopener"></a></b></div><div class="mu">Эта страница открыта через точку доступа и скоро перестанет отвечать: подключитесь Wi-Fi этого устройства (телефона/ноута) к сети <b id="ipswssid"></b> и откройте новый адрес.</div></div>
+        <div class="f">
+          <label class="w">SSID<input id="wssid" placeholder="MyWiFi"></label>
+          <label>Пароль<input id="wpass" type="password" placeholder="пусто — не менять"></label>
+          <label>Имя хоста<input id="whost"></label>
+        </div>
+        <div class="act">
+          <button class="b" id="wsav">Подключить</button>
+          <button class="b gh no" id="rb">Перезагрузка</button>
+        </div>
+      </article>
+      <article class="card">
+        <h2><span>MQTT</span><span class="hs"><span class="dot" id="md"></span><span id="mst">…</span></span></h2>
+        <div class="f">
+          <label class="w">Broker URI<input id="muri" placeholder="mqtt://192.168.1.10:1883"></label>
+          <label>Пользователь<input id="mus"></label>
+          <label>Пароль<input id="mpa" type="password" placeholder="пусто — не менять"></label>
+          <label>Client ID (MAC)<input id="mcid" readonly placeholder="MAC устройства"></label>
+          <label>Префикс топика<input id="mpf"></label>
+          <label class="sw"><span>Включить MQTT</span><input type="checkbox" id="men"><i class="tk"></i></label>
+        </div>
+        <div class="act"><button class="b" id="msav">Сохранить</button></div>
+      </article>
+      <article class="card" style="grid-column:1/-1">
+        <h2>Время — часовой пояс и NTP</h2>
+        <div class="f">
+          <select id="tze">
+            <option value="MSK-2">UTC+02:00 · Калининград</option>
+            <option value="MSK-3">UTC+03:00 · Москва</option>
+            <option value="SAMT-4">UTC+04:00 · Самара</option>
+            <option value="YEKT-5">UTC+05:00 · Екатеринбург</option>
+            <option value="OMST-6">UTC+06:00 · Омск</option>
+            <option value="KRAT-7">UTC+07:00 · Красноярск</option>
+            <option value="IRKT-8">UTC+08:00 · Иркутск</option>
+            <option value="YAKT-9">UTC+09:00 · Якутск</option>
+            <option value="VLAT-10">UTC+10:00 · Владивосток</option>
+            <option value="MAGT-11">UTC+11:00 · Магадан</option>
+            <option value="PETT-12">UTC+12:00 · Камчатка</option>
+            <option value="UTC0">UTC±00:00 · универсальное</option>
+            <option value="CET-1CEST,M3.5.0,M10.5.0/3">UTC+01:00 · Берлин/Париж (летнее время)</option>
+            <option value="EET-2EEST,M3.5.0,M10.5.0/4">UTC+02:00 · Киев/Хельсинки (летнее время)</option>
+            <option value="GMT0BST,M3.5.0/1,M10.5.0/2">UTC±00:00 · Лондон (летнее время)</option>
+            <option value="EST5EDT,M3.2.0,M11.1.0">UTC−05:00 · Нью-Йорк (летнее время)</option>
+            <option value="PST8PDT,M3.2.0,M11.1.0">UTC−08:00 · Лос-Анджелес (летнее время)</option>
+            <option value="NZST-12NZDT,M9.5.0,M4.1.0/3">UTC+12:00 · Новая Зеландия (летнее время)</option>
+          </select>
+          <label class="w">NTP сервер<input id="ntp" placeholder="pool.ntp.org"></label>
+        </div>
+        <div class="st"><span id="ttime">…</span></div>
+        <div class="act"><button class="b" id="tzsav">Сохранить</button></div>
+      </article>
+    </div>
+  </section>
+  <section id="p-scripts" class="panel">
+    <div class="cols">
+      <article class="card">
+        <h2>Скрипты</h2>
+        <div id="slist" class="lst"></div>
+        <div class="me" style="margin-top:10px">Единый каталог: <b>on_update()</b> — по расписанию, привязывается к элементам на вкладке «Сенсоры»; <b>on_frame(fx)</b> — кадры светодиодов, включается кнопкой «▶ Включить» или <b>rgb_effect('fx:имя', 0)</b> из любого скрипта. Оба хука в одном файле работают вместе и делят общий state; правка активной анимации подхватывается сама (без перезагрузки).</div>
+      </article>
+      <article class="card">
+        <h2>Редактор <span id="sf" class="mu"></span><span id="ftag" class="tag" style="display:none"></span></h2>
+        <textarea id="sedit" class="ed" spellcheck="false" placeholder="Выберите файл слева или создайте новый"></textarea>
+        <div id="lerr" style="display:none;margin-top:8px;font-size:.8rem;font-weight:600"></div>
+        <div id="tplrow" class="act" style="display:none;margin-top:12px">
+          <button class="b gh" data-tpl="fire">🔥 fire</button>
+          <button class="b gh" data-tpl="aurora">🌌 aurora</button>
+          <button class="b gh" data-tpl="plasma">✨ plasma</button>
+        </div>
+        <div class="st"><span id="sstat">Выберите файл слева или создайте новый</span></div>
+        <div class="act">
+          <button class="b" id="ssav" style="display:none">Сохранить</button>
+          <button class="b gh" id="sfmt" style="display:none" title="Заново расставить отступы во всём файле (нужен интернет)">⇉ Выровнять</button>
+          <button class="b gh" id="srun" style="display:none">Тест</button>
+          <button class="b gh" id="sfex" style="display:none">▶ Включить</button>
+          <button class="b gh" id="snew">＋ Lua-файл</button>
+          <button class="b gh no" id="sdel" style="display:none;margin-left:auto">Удалить</button>
+        </div>
+        <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--mu);font-size:.85rem">Справочник</summary>
+          <div id="rtabs" class="rtabs"><button data-r="s" class="on">API скриптов</button><button data-r="f">Примитивы fx</button></div>
+          <div id="ref-s" class="ref">
+            <div><b>on_update()</b> — вызывается по poll_interval; верните <i>{ключ=число}</i> — это станет показаниями элемента</div>
+            <div><b>sensors[id]</b> — данные любых элементов по ID со страницы «Сенсоры» (<i>sensors.temp_room.temperature</i>)</div>
+            <div><b>virtual_get(id)</b> — значение виртуального элемента по ID (страница «Сенсоры»): поле ввода (INPUT) — число, если введено число, иначе строка (текст); виртуальный переключатель (SWITCH) — 1/0 · <b>virtual_set(id, знач)</b> — записать значение (сохраняется в памяти устройства)</div>
+            <div><b>read(id)</b> — синоним sensors[id] · <b>self.id</b> — ID этого элемента · <b>self.script</b> — файл</div>
+            <div><b>state</b> — таблица, живущая между вызовами · <b>tick</b> — счётчик запусков</div>
+            <div><b>log(...)</b>, <b>print(...)</b> — журнал (виден по кнопке «Тест»)</div>
+            <div><b>mqtt_publish(topic,payload)</b> · <b>mqtt_connected()</b></div>
+            <div><b>time()</b> — unix-секунды · <b>time_ms()</b> — мс с загрузки · <b>sync_time([host])</b> — SNTP (без host — сервер из настроек «Подключение»; авто-старт при получении IP) · <b>date_str(fmt)</b> — локальное время (часовой пояс задаётся на вкладке «Подключение»)</div>
+            <div><b>json_encode(t)</b> · <b>json_decode(s)</b></div>
+            <div><b>gpio_mode(pin,mode)</b>: <i>'in'|'in_pu'|'in_pd'|'out'</i> · <b>gpio_read(pin)</b> · <b>gpio_write(pin,0|1)</b></div>
+            <div><b>pwm_setup(pin,freq)</b> · <b>pwm_set(pin,duty%)</b> — LEDC (до 6 каналов)</div>
+            <div><b>rgb_setup{mode='pwm', r=,g=,b=, invert=}</b> или <b>{mode='ws2812', pin=, count=}</b> · матрица: <b>cols=, rows=, layout='snake'|'rows'|'snake_col'|'cols', flipx=, flipy=</b> · <i>gamma=</i></div>
+            <div><b>rgb_set(r,g,b)</b> · <b>rgb_set_led(i,r,g,b)</b> · <b>rgb_brightness(0..100)</b> · <b>rgb_hsv(h,s,v)</b> · <b>rgb_hex('#ff8800')</b></div>
+            <div><b>rgb_effect('blink'|'breathe'|'rainbow'|'chase'|'none'|'fadein'|'fadeout', ms)</b> — fade: плавное вкл/выкл за ms · <b>'fx:имя'</b> — анимация из Lua-файла с on_frame (правится без перепрошивки) · <b>rgb_power(0|1)</b> · <b>rgb_state()</b></div>
+            <div><b>adc_read(pin)</b> — 0..4095 (на ESP32-C6: GPIO0–6)</div>
+            <div><b>sleep_ms(ms)</b> — ≤1000, пауза тормозит все скрипты (и кадры анимации)</div>
+            <div><b>Гибрид</b> — on_update() и on_frame(fx) в одном файле делят общий state/local; rgb_setup{...} удобно задать на первом кадре (fx.frame == 1)</div>
+            <div class="warn">on_update() выполняется не дольше 250 мс (watchdog), on_frame() — ~30 мс. Ошибка не роняет систему — показывается в списке и в «Тесте».</div>
+          
+          </div>
+          <div id="ref-f" class="ref" style="display:none">
+            <div><b>on_frame(fx)</b> — вызывается на каждом кадре движения (10–30 Гц; бюджет ~30 мс)</div>
+            <div><b>fx.t</b> — мс от старта эффекта · <b>fx.frame</b> — номер кадра · <b>fx.cols/rows/count</b></div>
+            <div><b>fx.px(x,y,r,g,b)</b> · <b>fx.set(i,r,g,b)</b> · <b>fx.px_hsv(x,y,h,s,v)</b> · <b>fx.set_hsv(i,h,s,v)</b> · <b>fx.clear(r,g,b)</b></div>
+            <div><b>fx.noise2(x, y, t)</b> — value-noise 0..255 из C (быстрый; слои шумов = плавные эффекты)</div>
+            <div><b>fx.setpal{'#000', {255,80,0}, ...}</b> · <b>fx.pxg(x,y,t01)</b> · <b>r,g,b = fx.grad(t01)</b> — палитра до 8 стопов</div>
+            <div><b>fx.heat(i)</b> / <b>fx.heat_set(i,v)</b> — персистентный буфер (симуляции пламени)</div>
+            <div class="warn">Ошибка в кадре отключает эффект (в serial-логе видно); при исправлении файла он перезагрузится сам.</div>
+          
+          </div>
+        </details>
+      </article>
+    </div>
+  </section>
+  <section id="p-ota" class="panel">
+    <article class="card">
+      <h2><span>Мониторинг</span><span class="live"><i></i>live</span></h2>
+      <div class="sys">
+        <div class="sysbk">
+          <div class="sysh"><span>Процессор</span><b id="syscpu">—</b></div>
+          <div class="pbar"><i id="scpu"></i></div>
+        </div>
+        <div class="sysbk">
+          <div class="sysh"><span>Оперативная память</span><b id="sysram">—</b></div>
+          <div class="pbar"><i id="sram"></i></div>
+          <div class="me">Свободно <span id="sramf">—</span> · мин. остаток <span id="sramm">—</span> · крупн. блок <span id="sraml">—</span></div>
+        </div>
+        <div class="sysbk">
+          <div class="sysh"><span>Хранилище storage</span><b id="sysfs">—</b></div>
+          <div class="pbar"><i id="sfs"></i></div>
+          <div class="me">Занято <span id="sfsu">—</span> · свободно <span id="sfsf">—</span></div>
+        </div>
+      </div>
+      <div class="me" style="margin-top:10px">Аптайм: <span id="sysup">—</span></div>
+      <div class="sysh" style="margin-top:14px"><span>Задачи</span><span class="hs">CPU за окно · свободный стек</span></div>
+      <div id="tklist" class="lst" style="margin-top:8px"></div>
+      <div class="st" style="margin-top:12px"><span id="luast">Lua: …</span></div>
+    </article>
+    <div class="cols">
+      <article class="card" id="c-ota">
+        <h2>Обновление прошивки (OTA)</h2>
+        <div class="f">
+          <label class="w">Файл прошивки .bin<input id="ofin" type="file" accept=".bin,application/octet-stream" style="padding:7px"></label>
+        </div>
+        <div class="act"><button class="b" id="oup" disabled>Загрузить и прошить</button></div>
+        <div class="pbar" id="opw" style="display:none"><i id="oprog"></i></div>
+        <div class="me" id="ostat"></div>
+        <div class="me">Не выключайте питание и не уходите со страницы во время загрузки (~1–2 мин).</div>
+      </article>
+      <article class="card" id="c-fw">
+        <h2>Текущая прошивка</h2>
+        <div id="oinfo" class="lst"></div>
+        <div class="me" id="fwusb" style="display:none">В сборке без OTA-слотов раздел «Обновление прошивки (OTA)» скрыт — прошивка обновляется только по USB.</div>
+      </article>
+    </div>
+  </section>
+</main>
+<div id="smodal" class="modal" role="dialog" aria-modal="true">
+  <div class="mcard">
+    <div class="mhd"><h2 id="fh">Добавить датчик</h2><button class="ib" id="sx" title="Закрыть">✕</button></div>
+    <div class="f">
+      <label class="w">ID<input id="sid" placeholder="temp_room"></label>
+      <label>Драйвер<select id="drv"></select></label>
+      <label>Тип<select id="typ"></select></label>
+      <label id="gpinLbl" style="display:none">Пин GPIO<input id="gpin" type="number" value="4" list="gp"></label>
+      <label style="display:none">Шина<input id="bus" value="I2C_0"></label>
+      <label style="display:none">Адрес<input id="addr" placeholder="напр. 0x44 (пусто = авто-скан)"><button type="button" class="ib" id="i2cScan" title="Сканировать шину и подставить найденный адрес" style="width:auto;min-height:30px;height:30px;margin-top:6px;font-size:13px;padding:0 10px">🔎 скан</button></label>
+      <label style="display:none">SDA<input id="sda" type="number" value="21" list="gp"></label>
+      <label style="display:none">SCL<input id="scl" type="number" value="22" list="gp"></label>
+      <label id="ntcModelbl" style="display:none">Схема NTC<select id="ntcMode"><option value="2">NTC к земле</option><option value="1">NTC к питанию</option></select></label>
+      <label id="ntcBetalbl" style="display:none">B-коэффициент<input id="ntcBeta" type="number" value="3950"></label>
+      <label id="ntcR25lbl" style="display:none">R NTC при 25 °C, Ом<input id="ntcR25" type="number" value="10000"></label>
+      <label id="ntcFixlbl" style="display:none">Балластный резистор, Ом<input id="ntcFix" type="number" value="10000"></label>
+      <label id="ntcVddlbl" class="w" style="display:none">Напряжение делителя, мВ<input id="ntcVdd" type="number" value="3300"></label>
+      <label id="dsIndexlbl" style="display:none">Номер на шине (index)<input id="dsIndex" type="number" value="0"></label>
+      <label id="dsAddrlbl" style="display:none">ROM-адрес (addr)<input id="dsAddr" placeholder="28FF641E1416034C"></label>
+      <label id="invLbl" class="sw" style="display:none"><span>Инверсия уровней (активный LOW)</span><input type="checkbox" id="inv"><i class="tk"></i></label>
+      <label id="inModelbl" style="display:none">Режим входа<select id="inMode"><option value="1">Вход + подтяжка к питанию</option><option value="0">Вход без подтяжки</option><option value="2">Вход + подтяжка к земле</option></select></label>
+      <label id="inLevellbl" style="display:none">Активный уровень<select id="inLevel"><option value="1">ВКЛ при высоком уровне (1)</option><option value="0">ВКЛ при низком (0)</option></select></label>
+      <label id="inDeblbl" style="display:none">Антидребезг, мс<input id="inDeb" type="number" value="50" step="10"></label>
+      <label class="w">Период опроса, мс<input id="int" type="number" value="5000" step="100"></label>
+      <label class="w">Единицы измерения (атрибут=единица)<input id="un" placeholder="temperature=°C, humidity=%, pressure=kPa"></label>
+      <label id="prstLbl" class="sw" style="display:none"><span>Сохранять состояние (не потеряется при перезагрузке)</span><input type="checkbox" id="prst" checked><i class="tk"></i></label>
+      <label class="sw"><span>Показывать показания на странице «Сенсоры»</span><input type="checkbox" id="shw" checked><i class="tk"></i></label>
+      <label class="w" id="scrLbl" style="display:none">Lua-файл с on_update (файлы на вкладке «Lua-файлы»)<select id="scr"></select></label>
+    </div>
+    <datalist id="gp"></datalist>
+    <div class="act">
+      <button class="b" id="add">✔ Сохранить</button>
+      <button class="b gh" id="ecancel">Отмена</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+'use strict';
+const $=i=>document.getElementById(i);
+const H=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=(u,o)=>fetch(u,o).then(r=>r.ok?r.json():null).catch(()=>null);
+const POST=(u,d)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+const sl=ms=>new Promise(r=>setTimeout(r,ms));
+const num=v=>Math.round(v*100)/100;
+let cfg={sensors:[]},sup=[],wb={},hist={},tele={},vit={};
+
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(e.h);e.h=setTimeout(()=>e.classList.remove('on'),2400)}
+
+/* --- тема --- */
+function th(){const d=document.documentElement.dataset.theme==='dark';document.documentElement.dataset.theme=d?'light':'dark';localStorage.theme=document.documentElement.dataset.theme;$('ti').textContent=d?'☾':'☀'}
+$('ti').onclick=th;
+$('ti').textContent=document.documentElement.dataset.theme==='dark'?'☀':'☾';
+
+/* --- вкладки --- */
+for(const b of $('tabs').children)b.onclick=()=>{
+  for(const p of document.querySelectorAll('.panel'))p.classList.toggle('on',p.id==='p-'+b.dataset.t);
+  for(const c of $('tabs').children)c.classList.toggle('on',c===b);
+  if(b.dataset.t==='sensors')loadTele();   /* страница «Данные» объединена с «Сенсоры» */
+  if(b.dataset.t==='scripts')scriptsLoad();
+  if(b.dataset.t==='conn'){wifiStat();mqttStat();timeTick()}   /* вход на вкладку — обновляем статусы сразу */
+  if(b.dataset.t==='ota'){otaLoad();sysLoad()}   /* слоты OTA + мониторинг системы */
+};
+
+/* --- сенсоры --- */
+/* Типы, у которых вместо I2C-шины указывается пин GPIO
+   (NTC и ADC — вход АЦП, DS18B20 — линия 1-Wire, PIN — выход, GPIO_IN — вход;
+    в web показываются как GPIO_out (relay) и GPIO_in (button) — см. TYPE_NAME) */
+const GPIO_TYPES={NTC:1,ADC:1,DS18B20:1,PIN:1,GPIO_IN:1};
+/* Отображаемые имена типов в web: в конфигурации внутреннее значение PIN/GPIO_IN не меняется */
+const TYPE_NAME={PIN:'GPIO_out (relay)',GPIO_IN:'GPIO_in (button)',INPUT:'ввод (переменная)',SWITCH:'переключатель (без GPIO)'};
+function drvCh(){
+  $('typ').innerHTML=sup.filter(s=>s.backend===$('drv').value).map(s=>'<option value="'+H(s.type)+'">'+H(TYPE_NAME[s.type]||s.type)+'</option>').join('');
+  updVis();
+  unDef();
+}
+/* Видимость полей формы: I2C-шина / пин GPIO / NTC-параметры / скрипт */
+function updVis(){
+  const isLua=$('drv').value==='lua',isVirt=$('drv').value==='virtual',onchip=$('drv').value==='builtin',t=$('typ').value;
+  const useGpio=!!GPIO_TYPES[t],isNtc=t==='NTC',isDs=t==='DS18B20',isPin=t==='PIN',isIn=t==='GPIO_IN';
+  /* Шина/адрес/SDA/SCL применимы только к I2C-датчикам — для остальных скрываются */
+  ['bus','addr','sda','scl'].forEach(x=>{const i2cOk=!onchip&&!isLua&&!isVirt&&!useGpio;$(x).disabled=!i2cOk;$(x).parentElement.style.display=i2cOk?'':'none'});
+  $('gpinLbl').style.display=useGpio?'grid':'none';
+  ['ntcModelbl','ntcBetalbl','ntcR25lbl','ntcFixlbl','ntcVddlbl'].forEach(id=>$(id).style.display=isNtc?'grid':'none');
+  ['dsIndexlbl','dsAddrlbl'].forEach(id=>$(id).style.display=isDs?'grid':'none');
+  $('invLbl').style.display=(isPin||isIn)?'':'none';
+  ['inModelbl','inLevellbl','inDeblbl'].forEach(id=>$(id).style.display=isIn?'grid':'none');
+  $('scrLbl').style.display=isLua?'grid':'none';
+  /* «Сохранять состояние» — только у виртуальных элементов (INPUT/SWITCH) */
+  $('prstLbl').style.display=isVirt?'':'none';
+}
+/* Типовые атрибуты и единицы по типу датчика — подставляются в поле «Единицы измерения» */
+const DEFU={BME280:'temperature=°C, humidity=%, pressure=kPa',AHT20:'temperature=°C, humidity=%',SHT3x:'temperature=°C, humidity=%',SCD40:'co2=ppm, temperature=°C, humidity=%',SCD41:'co2=ppm, temperature=°C, humidity=%',SHT4x:'temperature=°C, humidity=%',NTC:'temperature=°C',ADC:'voltage=V, raw=ед.',DS18B20:'temperature=°C',ESP_TEMP:'temperature=°C'};
+let lastUN='';
+function unDef(){
+  const d=DEFU[$('typ').value]||'';
+  if($('un').value.trim()===''||$('un').value.trim()===lastUN)$('un').value=d;
+  lastUN=d;
+}
+/* Разбор поля единиц: "temperature=°C, pressure=kPa" -> {temperature:'°C',pressure:'kPa'} */
+function parseUnits(s){
+  const o={};
+  for(let p of s.split(',')){
+    const i=p.indexOf('=');
+    if(i<0)continue;
+    const k=p.slice(0,i).trim(),v=p.slice(i+1).trim().slice(0,12);
+    if(k&&v)o[k]=v;
+  }
+  return o;
+}
+/* Разбор I2C-адреса: число, "0x44"/"0X44" или голые цифры ("44" читается как hex —
+   поле адреса всегда шестнадцатеричное; backend вернёт строку "0x44").
+   NaN — разобрать не удалось. */
+function addrNum(v){
+  if(typeof v==='number')return Number.isFinite(v)?Math.floor(v):NaN;
+  const t=String(v??'').trim().toLowerCase();
+  if(/^0x[0-9a-f]+$/.test(t))return parseInt(t.slice(2),16);
+  if(/^[0-9a-f]+$/.test(t))return parseInt(t,16);
+  return NaN;
+}
+/* Каноничный вид адреса: "0x44" (префикс 0x, HEX в верхнем регистре, 2 разряда) */
+function addrFmt(v){
+  const n=addrNum(v);
+  return '0x'+(Number.isFinite(n)?n:0).toString(16).toUpperCase().padStart(2,'0');
+}
+$('drv').onchange=drvCh;
+$('typ').onchange=()=>{updVis();unDef()};
+async function bootSensors(){
+  sup=await api('/api/sensors/supported')||[];
+  $('drv').innerHTML=[...new Set(sup.map(s=>s.backend))].map(b=>'<option>'+H(b)+'</option>').join('');
+  drvCh();
+  cfg=await api('/api/config')||{sensors:[]};
+  render();
+}
+/* Единая карточка датчика = конфигурация (id, драйвер, период, единицы) + живые показания:
+   страница «Данные» объединена со страницей «Сенсоры». editI: -1 = добавление,
+   иначе индекс редактируемого элемента карточки */
+let editI=-1;
+function render(){
+  const T=$('tiles');
+  /* печатает кто-нибудь в поле ввода виртуального элемента? — не сбрасываем */
+  const af=document.activeElement;
+  const keep=(af&&af.classList&&af.classList.contains('vin'))?{id:af.dataset.v,v:af.value}:null;
+  /* деталь-описание в зависимости от типа: Lua-скрипт / виртуальный / пин GPIO / чип / I2C */
+  const det=s=>s.driver==='lua'?`скрипт: ${H(s.script||(s.id+'.lua'))}`
+    :s.driver==='virtual'?(s.type==='INPUT'
+      ?`программная переменная без GPIO${s.persist?' · сохраняется после перезагрузки':' · без сохранения (сброс)'} · чтение в Lua: virtual_get('${H(s.id)}')`
+      :`программный переключатель без GPIO${s.persist?' · сохраняется после перезагрузки':' · без сохранения (перезагрузка → выкл)'} · в Lua: virtual_get('${H(s.id)}') или sensors.${H(s.id)}.state`)
+    :GPIO_TYPES[s.type]?(s.type==='NTC'
+      ?`пин ${H(s.gpio==null?'—':s.gpio)} · ${+(s.ntc_mode||2)===1?'NTC к питанию':'NTC к земле'} · B=${H(s.ntc_beta||3950)} · R25=${H(s.ntc_r25_ohm||10000)} · R=${H(s.ntc_fixed_ohm||10000)} Ω · Vdd=${H(s.ntc_vdd_mv||3300)} мВ`
+      :s.type==='ADC'?`АЦП чипа · пин ${H(s.gpio==null?'—':s.gpio)}`
+      :s.type==='PIN'?`Выход · пин ${H(s.gpio==null?'—':s.gpio)}${s.invert?' · инверсия':''}`
+      :s.type==='GPIO_IN'?`Вход · пин ${H(s.gpio==null?'—':s.gpio)} · ${+(s.in_mode||0)===1?'pull-up':+(s.in_mode||0)===2?'pull-down':'без подтяжки'} · ВКЛ при ${s.in_level===0?'0':'1'}${+(s.deb_ms||0)>0?' · дребезг '+s.deb_ms+' мс':''}${s.invert?' · инверсия':''}`
+      :`1-Wire · пин ${H(s.gpio==null?'—':s.gpio)} · ${s.ds_addr?'адрес '+H(s.ds_addr):'индекс '+(s.ds_index==null?0:s.ds_index)}`)
+    :s.driver==='builtin'?'встроен в чип':H(s.bus)+' · '+H(s.i2c_addr)+` · ${H(s.sda_gpio)}/${H(s.scl_gpio)}`;
+  T.innerHTML=cfg.sensors.length?cfg.sensors.map((s,i)=>{
+    const uns=s.units&&Object.keys(s.units).length?' · '+H(Object.entries(s.units).map(([a,u])=>a+'='+u).join('  ')):'';
+    const meta=`<div class="me">${H(s.driver)} · ${H(TYPE_NAME[s.type]||s.type)} · ${det(s)} · ${s.poll_interval_ms} мс${uns}${s.show===false?' · скрыт':''}</div>`;
+    let body;
+    if(s.driver==='virtual'&&s.type==='INPUT'){
+      /* поле ввода — главный элемент карточки (работает и при show=false) */
+      const vv=(vit[s.id]&&vit[s.id].text)||'';
+      body='<div class="kv vinrow"><input class="vin" data-v="'+H(s.id)+'" value="'+H(vv)+'" spellcheck="false" maxlength="64" placeholder="значение переменной"><button class="vset" data-v="'+H(s.id)+'" title="Записать значение">✔</button></div>'
+        +'<div class="me">В Lua: <b>virtual_get(\''+H(s.id)+'\')</b>'+(typeof (vit[s.id]||{}).num==='number'?' · также sensors.'+H(s.id)+'.value':'')+'</div>';
+    }else if(s.show===false)body='<div class="me">Показания скрыты — датчик опрашивается и публикуется в MQTT</div>';
+    else{
+      const uo=s.units||{};
+      /* порядок показа строк: перечисленные в s.order — первыми (в сохранённом порядке),
+         остальные — следом в алфавитном (сервер отдаёт атрибуты в порядке std::map);
+         кнопка «⇑» на строке поднимает атрибут наверх (pushTop) */
+      const ord=Array.isArray(s.order)?s.order:[];
+      const es=[...Object.entries(tele[s.id]||{})].sort((p,q)=>(ord.indexOf(p[0])<0?99:ord.indexOf(p[0]))-(ord.indexOf(q[0])<0?99:ord.indexOf(q[0])));
+      if(!es.length)body='<div class="empty sm">— нет данных —</div>';
+      else body=es.map(([a,v],j)=>{
+        const un=typeof v==='number'?(uo[a]?' '+H(uo[a]):''):'';
+        return '<div class="kv"><span data-u data-s="'+H(s.id)+'" data-a="'+H(a)+'" title="Клик — задать единицы измерения">'+H(a)+'</span><b>'+(typeof v==='number'?num(v):H(v))+un+(es.length>1?'<button class="ord" data-top="1" data-s="'+H(s.id)+'" data-a="'+H(a)+'" title="Клик — показать атрибут первым">⇑</button>':'')+'</b></div>'+(j===0&&typeof v==='number'?'<canvas data-s="'+H(s.id)+'·'+H(a)+'"></canvas>':'');
+      }).join('');
+    }
+    return `<div class="tile${s.show===false?' off':''}${i===editI?' editing':''}"><h4><span class="nm">${H(s.id)}</span>${ctlBtn(s.id,tele)}<span class="btns"><button class="edt" data-i="${i}" title="Редактировать">✎</button><button class="del" data-i="${i}" title="Удалить">✕</button></span></h4>${meta}${body}</div>`;
+  }).join(''):'<div class="empty">📡<br>Датчики не добавлены — нажмите «＋ Добавить датчик»</div>';
+  /* восстановление фокуса и набранного текста после перерисовки (loadTele каждые 2 с) */
+  if(keep){
+    const inp=T.querySelectorAll('.vin');
+    for(const i of inp){
+      if(i.dataset.v!==keep.id)continue;
+      i.value=keep.v;
+      i.focus();
+      const L=i.value.length;
+      i.setSelectionRange(L,L);
+      break;
+    }
+  }
+}
+/* Скан I2C-шины по полям формы (шина/SDA/SCL): POST /api/i2c/scan.
+   Один найденный адрес — подставляется и возвращается; несколько — перечень
+   в toast; устройство «ACK только адреса» — предупреждение (питание/чип). */
+async function i2cScanDo(){
+  const bus=$('bus').value.trim()||'I2C_0',sda=Math.floor(+$('sda').value)||21,scl=Math.floor(+$('scl').value)||22;
+  toast('🔎 Скан '+bus+' ('+sda+'/'+scl+') — подождите…');
+  let j;
+  try{
+    const r=await fetch('/api/i2c/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bus,sda_gpio:sda,scl_gpio:scl})});
+    if(!r.ok){toast('⚠ Скан не удался (HTTP '+r.status+')');return null}
+    j=await r.json();
+  }catch(e){toast('⚠ Скан не удался: '+(e.message||e));return null}
+  const a=j.found||[];
+  if(!a.length){toast('⚠ Устройств не найдено — проверьте питание 3В3, GND и пины SDA/SCL ('+j.bus+' '+j.sda_gpio+'/'+j.scl_gpio+')');return null}
+  const lbl=e=>e.ack_only?'ACK-адрес только (данные NACK)':e.raw?'отвечает и на чтение':'полноценный ACK адрес+данные';
+  if(a.length===1){$('addr').value=a[0].addr;toast(a[0].ack_only?'⚠ '+a[0].addr+': '+lbl(a[0])+' — проверьте питание 3В3/GND и пины (адрес подставлен)':'✔ '+a[0].addr+': '+lbl(a[0])+' — адрес подставлен');return a[0].addr}
+  toast('ℹ На шине несколько устройств:\n'+a.map(e=>e.addr+' ('+lbl(e)+')').join(', '));
+  $('addr').value=a[0].addr;
+  return null;
+}
+$('i2cScan').onclick=()=>i2cScanDo();
+/* Сбор датчика из формы — общий для добавления и правки */
+async function formSensor(){
+  const id=$('sid').value.trim();
+  if(!id){toast('⚠ Укажите ID датчика');return null}
+  /* I2C-датчик с пустым Адресом: запускаем скан шины (шина/SDA/SCL — из полей формы) */
+  const drvV=$('drv').value,typV=$('typ').value;
+  const isI2c=drvV!=='builtin'&&drvV!=='lua'&&drvV!=='virtual'&&!GPIO_TYPES[typV];
+  if(isI2c&&!$('addr').value.trim()){
+    const found=await i2cScanDo();
+    if(!found)return null;
+  }
+  /* Адрес I2C: разбор ("0X44"/"44" → hex) и канонизация в «0x44»; проверка диапазона
+     7-бит (0x08–0x77) — иначе мусор на устройстве молча превратится в 0 (strtoul) */
+  let addrV='0x76';
+  if(isI2c){
+    const an=addrNum($('addr').value);
+    if(!Number.isFinite(an)||an<0x08||an>0x77){
+      toast('⚠ Адрес I2C: укажите 7-битный адрес 0x08–0x77 (напр. 0x44) или оставьте пустым для авто-скана');
+      return null;
+    }
+    addrV=addrFmt(an);
+  }
+  const o={id,driver:drvV,type:typV,bus:$('bus').value,sda_gpio:+$('sda').value||21,scl_gpio:+$('scl').value||22,i2c_addr:addrV,poll_interval_ms:+$('int').value||5000,show:$('shw').checked};
+  if(GPIO_TYPES[o.type]){
+    const g=Math.floor(+$('gpin').value);
+    if(!(g>=0)){toast('⚠ Укажите пин GPIO');return null}
+    o.gpio=g;
+    if(o.type==='NTC'){
+      o.ntc_mode=+$('ntcMode').value||2;
+      o.ntc_beta=+$('ntcBeta').value||3950;
+      o.ntc_r25_ohm=+$('ntcR25').value||10000;
+      o.ntc_fixed_ohm=+$('ntcFix').value||10000;
+      o.ntc_vdd_mv=+$('ntcVdd').value||3300;
+    }
+    if(o.type==='DS18B20'){
+      o.ds_index=Math.max(0,Math.floor(+$('dsIndex').value)||0);
+      const a=$('dsAddr').value.trim().toUpperCase();
+      if(a)o.ds_addr=a;
+    }
+    if(o.type==='PIN')o.invert=$('inv').checked;
+    if(o.type==='GPIO_IN'){
+      o.in_mode=+$('inMode').value||0;
+      o.in_level=+$('inLevel').value;
+      if(o.in_level!==0&&o.in_level!==1)o.in_level=1;
+      o.deb_ms=Math.max(0,Math.min(1000,Math.floor(+$('inDeb').value)||0));
+      o.invert=$('inv').checked;
+    }
+  }
+  const un=parseUnits($('un').value);
+  if($('un').value.trim()&&!Object.keys(un).length){toast('⚠ Единицы: формат «атрибут=единица», разделяйте запятыми');return null}
+  if(Object.keys(un).length)o.units=un;
+  /* виртуальные элементы: тумблер «Сохранять состояние» (NVS) */
+  if(o.driver==='virtual')o.persist=$('prst').checked;
+  if(o.driver==='lua'){
+    if(!$('scr').value){toast('⚠ Выберите Lua-файл с on_update (вкладка «Lua-файлы»)');return null}
+    o.script=$('scr').value;
+  }
+  /* порядок атрибутов на карточке задаётся кнопкой «⇑» — при правке датчика сохраняем его */
+  if(editI>=0&&cfg.sensors[editI]&&Array.isArray(cfg.sensors[editI].order))o.order=cfg.sensors[editI].order;
+  return o;
+}
+/* Форма датчика сохраняется сразу на устройстве: POST /api/config пересоздаёт датчики.
+   pushConfig(): отправка текущего cfg + свежая копия с устройства; false — сбой (ресинхронизация) */
+async function pushConfig(){
+  const r=await POST('/api/config',{sensors:cfg.sensors});
+  if(!r){toast('⚠ Ошибка сохранения на устройстве');cfg=await api('/api/config')||cfg;render();return false}
+  cfg=await api('/api/config')||cfg;
+  return true;
+}
+$('add').onclick=async()=>{
+  const o=await formSensor();if(!o)return;
+  if(cfg.sensors.some((s,i)=>i!==editI&&s.id===o.id))return toast('⚠ Датчик с таким ID уже есть');
+  const wasEdit=editI>=0;
+  if(wasEdit)cfg.sensors[editI]=o;else cfg.sensors.push(o);
+  if(!await pushConfig())return;
+  exitEdit();render();
+  toast(wasEdit?'✔ Изменено':'✔ Добавлено');
+};
+/* Редактирование существующего датчика: заполняем форму текущими значениями */
+function startEdit(i){
+  const s=cfg.sensors[i];if(!s)return;
+  editI=i;
+  $('drv').value=s.driver;drvCh();
+  $('typ').value=s.type;
+  updVis();
+  $('sid').value=s.id;
+  $('bus').value=s.bus||'I2C_0';
+  $('addr').value=addrFmt(s.i2c_addr);   /* "0x44" из строки/числа — без двойного префикса "0x0x.." */
+  $('sda').value=s.sda_gpio;$('scl').value=s.scl_gpio;
+  $('gpin').value=(s.gpio==null||s.gpio<0)?'':s.gpio;
+  $('ntcMode').value=String(s.ntc_mode||2);
+  $('ntcBeta').value=s.ntc_beta||3950;
+  $('ntcR25').value=s.ntc_r25_ohm||10000;
+  $('ntcFix').value=s.ntc_fixed_ohm||10000;
+  $('ntcVdd').value=s.ntc_vdd_mv||3300;
+  $('dsIndex').value=(s.ds_index==null||s.ds_index<0)?0:s.ds_index;
+  $('dsAddr').value=s.ds_addr||'';
+  $('inv').checked=!!s.invert;
+  $('inMode').value=String(s.in_mode==null?1:s.in_mode);
+  $('inLevel').value=String(s.in_level===0?0:1);
+  $('inDeb').value=s.deb_ms==null?50:s.deb_ms;
+  $('int').value=s.poll_interval_ms;
+  $('shw').checked=s.show!==false;
+  $('prst').checked=!!s.persist;
+  const uns=s.units&&Object.keys(s.units).length?Object.entries(s.units).map(([a,u])=>a+'='+u).join(', '):'';
+  $('un').value=uns;
+  /* sentinel: авто-подстановка единиц по типу не должна затирать единицы датчика при его правке */
+  lastUN='\u0000';
+  $('scr').value=s.script||'';
+  $('fh').textContent='Редактирование: '+s.id;
+  render();      /* подсветить редактируемую карточку за всплывающей формой */
+  openForm();
+  $('sid').focus();
+}
+function exitEdit(){
+  editI=-1;
+  $('fh').textContent='Добавить датчик';
+  lastUN=$('un').value.trim();   /* возврат к обычной авто-подстановке для добавления */
+}
+/* --- всплывающая форма датчика: по умолчанию скрыта, показывается поверх карточек.
+   Скрыта до вызова; закрытие — Отмена, ✕, Esc или клик по фону (при правке режим правки сбрасывается) --- */
+function openForm(){$('smodal').classList.add('on')}
+function closeForm(){$('smodal').classList.remove('on')}
+function cancelForm(){if(editI>=0)exitEdit();closeForm()}
+$('ecancel').onclick=cancelForm;
+$('sx').onclick=cancelForm;
+/* новый датчик: ID/адрес пустые, «Сохранять состояние» — по умолчанию включён */
+$('sopen').onclick=()=>{if(editI>=0)exitEdit();$('sid').value='';$('addr').value='';$('prst').checked=true;openForm();$('sid').focus()};
+$('smodal').onclick=e=>{if(e.target===$('smodal'))cancelForm()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('smodal').classList.contains('on'))cancelForm()});
+/* удаление карточки: POST /api/config сразу (двойной клик — подтверждение, как у скриптов) */
+let delArm={i:-1,id:''};
+async function delSensor(i){
+  const s=cfg.sensors[i];if(!s)return;
+  if(editI>=0)exitEdit();        /* индексы съезжают — редактирование безопаснее завершить */
+  cfg.sensors.splice(i,1);
+  if(!await pushConfig())return;
+  render();
+  toast('✔ Удалено');
+}
+/* --- WiFi --- */
+async function wifiLoad(){wb=await api('/api/wifi')||{};$('wssid').value=wb.ssid||'';$('whost').value=wb.hostname||'SensorHUB'}
+async function wifiStat(){
+  const s=await api('/api/wifi/status');if(!s)return;
+  const ok=!!s.sta_connected;
+  $('hd').classList.toggle('ok',ok);$('wd').classList.toggle('ok',ok);
+  $('chip').textContent=ok?'IP '+s.ip+' · '+s.rssi+' dBm':'AP '+(s.ap_ssid||'—');
+  $('wst').textContent=ok?'Подключено · IP '+s.ip+' · '+s.rssi+' dBm':'Нет сети · точка доступа '+(s.ap_ssid||'—')+(s.disconnect_reason?' ('+(s.disconnect_reason_text||s.disconnect_reason)+')':'');
+  /* Страницу открыли с адреса AP (192.168.4.1), а контроллер уже подключился к роутеру
+     с другим IP — показываем карточку с новым адресом: AP отключится через окно отсрочки,
+     и текущая страница перестанет отвечать. Если открыты уже по адресу устройства — молчим. */
+  const isIp=h=>/^(\d{1,3}\.){3}\d{1,3}$/.test(h);
+  const moved=ok&&s.ip&&isIp(location.hostname)&&location.hostname!==s.ip;
+  $('ipsw').classList.toggle('on',moved);
+  if(moved){
+    $('ipswurl').href='http://'+s.ip+'/';$('ipswurl').textContent='http://'+s.ip+'/';
+    $('ipswssid').textContent=$('wssid').value.trim()||'родной WiFi';
+  }
+  if(moved&&!wifiStat.ipsh){wifiStat.ipsh=true;toast('✔ WiFi: новый адрес http://'+s.ip)}
+  if(!moved)wifiStat.ipsh=false;
+}
+$('wsav').onclick=async()=>{
+  const r=await POST('/api/wifi',{ssid:$('wssid').value.trim(),password:$('wpass').value||'***',hostname:$('whost').value.trim()||'SensorHUB',ap_fallback:wb.ap_fallback!==false});
+  if(!r)return toast('⚠ Ошибка сохранения WiFi');
+  toast('Сохранено, подключаемся…');$('wpass').value='';
+  for(let i=0;i<15;i++){await sl(2000);await wifiStat()}
+};
+let arm=0;
+$('rb').onclick=async()=>{
+  if(arm){arm=0;await POST('/api/reboot',{});toast('Перезагрузка…');return}
+  arm=1;$('rb').textContent='Точно?';
+  setTimeout(()=>{arm=0;$('rb').textContent='Перезагрузка'},2600);
+};
+
+/* --- MQTT --- */
+async function mqttLoad(){
+  const m=await api('/api/mqtt')||{};
+  $('muri').value=m.uri||'';$('mus').value=m.username||'';$('mcid').value=m.client_id||'';$('mpf').value=m.topic_prefix||'/sensorhub';$('men').checked=!!m.enabled;
+}
+$('msav').onclick=async()=>{
+  const u=$('muri').value.trim();
+  if(u&&!/^mqtts?:\/\//.test(u))return toast('⚠ URI должен начинаться с mqtt://');
+  const r=await POST('/api/mqtt',{uri:u,username:$('mus').value,password:$('mpa').value||'***',client_id:$('mcid').value,topic_prefix:$('mpf').value,enabled:$('men').checked});
+  r?toast('✔ MQTT сохранён'):toast('⚠ Ошибка сохранения MQTT');
+  setTimeout(mqttStat,2000);
+};
+async function mqttStat(){
+  const s=await api('/api/mqtt/status');
+  const d=$('md'),st=$('mst');
+  if(!s)return;   /* устройства нет в сети — оставляем последнее известное состояние */
+  d.classList.toggle('ok',!!s.connected);
+  d.classList.toggle('warn',!!s.enabled&&!s.connected);
+  st.textContent=!s.enabled?'MQTT выключен':s.connected?'Подключено к брокеру':(s.last_error?'Нет связи: '+s.last_error:'Подключение…');
+}
+
+/* --- часовой пояс --- */
+/* uptime (с) -> "1d 22:01": дни и часы:минуты */
+const upStr=s=>{s=Math.max(0,Math.floor(+s||0));return ((s/86400)|0)+'d '+String(((s%86400)/3600)|0).padStart(2,'0')+':'+String(((s%3600)/60)|0).padStart(2,'0')};
+/* Строка времени/uptime рендерится отдельно, чтобы строка «тикала» от периодического опроса /api/time */
+function timeRender(t){
+  $('ttime').textContent=t.synced?'Время на устройстве: '+t.local+' (uptime: '+upStr(t.uptime_s)+')':'Время не синхронизировано — SNTP пробует синхронизировать время автоматически сразу после подключения WiFi (сервер '+(t.ntp||'pool.ntp.org')+'), в Lua есть sync_time()';
+}
+async function tzLoad(){
+  const t=await api('/api/time')||{};
+  if(t.tz)$('tze').value=t.tz;   /* select задаём только при загрузке страницы и после сохранения — не перетираем выбор пользователя */
+  if(t.ntp)$('ntp').value=t.ntp; /* NTP сервер из настроек устройства (дефолт pool.ntp.org) */
+  timeRender(t);
+}
+/* Тик времени устройства: время и uptime обновляются сами, пока открыта вкладка «Подключение» */
+function timeTick(){api('/api/time').then(t=>{if(t)timeRender(t)})}
+$('tzsav').onclick=async()=>{
+  const r=await POST('/api/time',{tz:$('tze').value,ntp:$('ntp').value.trim()});
+  r?toast('✔ Время сохранено: часовой пояс и NTP сервер'):toast('⚠ Некорректный часовой пояс или NTP сервер');
+  tzLoad();
+};
+
+/* --- телеметрия --- */
+/* кнопка-тумблер для управляемых элементов: PIN (выход GPIO) и виртуальный SWITCH */
+const ctlBtn=(k,t)=>{const s=cfg.sensors.find(x=>x.id===k);
+  const ok=s&&((s.driver==='builtin'&&s.type==='PIN')||(s.driver==='virtual'&&s.type==='SWITCH'));
+  if(!ok)return '';
+  const v=((t[k]||{}).state||0)?1:0;
+  return ' <button class="ctl'+(v?' on':'')+'" data-c="'+H(k)+'" title="Переключить элемент">'+(v?'ВКЛ':'ВЫКЛ')+'</button>'};
+async function loadTele(){
+  tele=await api('/api/telemetry')||{};
+  vit=await api('/api/virtual')||{};   /* значения полей ввода INPUT / состояние SWITCH */
+  /* датчики с show=false опрашиваются (и публикуются в MQTT), но показания их
+     карточек на странице «Сенсоры» не выводятся. Спарклайн пополняется тоже здесь,
+     но только при ИЗМЕНЕНИИ значения: страница запрашивает телеметрию каждые 2 с,
+     а датчик отдаёт кэш раз в poll_interval — без проверки приходящий кэш рисовал
+     бы дубли точек (график двигался бы чаще опроса датчика и «съедал» историю).
+     Перерисовки при правке конфигурации историю не дублируют */
+  for(const s of cfg.sensors){
+    if(s.show===false)continue;
+    const t=tele[s.id]||{};
+    for(const a in t){
+      if(typeof t[a]!=='number')continue;
+      const hh=hist[s.id+'·'+a]||(hist[s.id+'·'+a]=[]);
+      if(hh.length&&hh[hh.length-1]===t[a])continue;   /* значение не изменилось — нового измерения не было */
+      hh.push(t[a]);if(hh.length>40)hh.shift()
+    }
+  }
+  render();
+  draw();
+}
+function draw(){
+  const ac=getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+  for(const c of $('tiles').querySelectorAll('canvas')){
+    const s=hist[c.dataset.s]||[],w=c.width=c.offsetWidth*2,h=c.height=c.offsetHeight*2,x=c.getContext('2d'),p=h*.18;
+    x.clearRect(0,0,w,h);
+    if(!s.length)continue;
+    if(s.length===1){x.fillStyle=ac;x.beginPath();x.arc(w/2,h/2,4,0,7);x.fill();continue}
+    const mx=Math.max(...s),mn=Math.min(...s),rg=mx-mn||1,X=j=>j*w/(s.length-1),Y=v=>p+(h-2*p)*(1-(v-mn)/rg);
+    x.strokeStyle=ac;x.lineWidth=3;x.lineJoin='round';x.beginPath();
+    s.forEach((v,j)=>j?x.lineTo(X(j),Y(v)):x.moveTo(X(0),Y(v)));
+    x.stroke();
+    x.lineTo(w,h);x.lineTo(0,h);x.closePath();
+    const g=x.createLinearGradient(0,0,0,h);g.addColorStop(0,ac+'44');g.addColorStop(1,ac+'00');
+    x.fillStyle=g;x.fill();
+  }
+}
+/* клики по карточкам датчиков: удаление ✕ / правка ✎ / тумблер / единицы по клику на параметр */
+$('tiles').onclick=e=>{
+  const del=e.target.closest('.del');
+  if(del){
+    const i=+del.dataset.i,s=cfg.sensors[i];if(!s)return;
+    if(delArm.i!==i||delArm.id!==s.id){
+      clearTimeout(delArm.tm);
+      delArm={i,id:s.id,tm:setTimeout(()=>{delArm={i:-1,id:''}},2600)};
+      return toast('Удалить '+s.id+'? Нажмите ещё раз');
+    }
+    clearTimeout(delArm.tm);delArm={i:-1,id:''};
+    delSensor(i);
+    return
+  }
+  const ed=e.target.closest('.edt');
+  if(ed)return startEdit(+ed.dataset.i);
+  /* запись значения виртуального поля ввода */
+  const vs=e.target.closest('.vset');
+  if(vs){
+    const inp=$('tiles').querySelector('.vin[data-v="'+vs.dataset.v+'"]');
+    if(inp)vsave(vs.dataset.v,inp.value);
+    return
+  }
+  const ctl=e.target.closest('.ctl');
+  if(ctl){
+    const id=ctl.dataset.c,cur=((tele[id]||{}).state||0)?1:0;
+    POST('/api/control',{id,value:cur?0:1}).then(r=>r?loadTele():toast('⚠ Не удалось переключить'));
+    return
+  }
+  /* порядок атрибутов: «⇑» на строке — атрибут наверх (проверка до data-u: кнопка живёт в строке) */
+  const tp=e.target.closest('[data-top]');
+  if(tp)return pushTop(tp.dataset.s,tp.dataset.a);
+  const el=e.target.closest('[data-u]');if(el)setUnit(el.dataset.s,el.dataset.a)
+};
+/* Запись значения виртуального элемента (тип INPUT) на устройстве */
+async function vsave(id,val){
+  const r=await POST('/api/virtual',{id,value:String(val)});
+  if(!r)return toast('⚠ Не удалось записать значение');
+  (vit[id]||(vit[id]={})).text=String(val);
+  toast('✔ Значение записано: '+id+' — доступно в Lua через virtual_get(\''+id+'\')');
+}
+/* Enter в поле ввода виртуального элемента — тоже запись */
+$('tiles').addEventListener('keydown',e=>{
+  const i=e.target.closest('.vin');
+  if(i&&e.key==='Enter'){e.preventDefault();vsave(i.dataset.v,i.value)}
+});
+async function setUnit(sid,attr){
+  const s=cfg.sensors.find(x=>x.id===sid);
+  if(!s)return toast('⚠ Элемент не найден в конфигурации');
+  const u=prompt('Единицы измерения «'+sid+'.'+attr+'»\nНапример: °C, %, kPa, V, м/с (пусто — убрать)',(s.units&&s.units[attr])||'');
+  if(u===null)return;
+  const val=u.trim().slice(0,12);
+  if(val){(s.units||(s.units={}))[attr]=val}else if(s.units){delete s.units[attr];if(!Object.keys(s.units).length)delete s.units}
+  const r=await POST('/api/config',{sensors:cfg.sensors});
+  if(!r)return toast('⚠ Ошибка сохранения');
+  cfg=await api('/api/config')||cfg;
+  loadTele();render();toast('✔ Сохранено');
+}
+/* Порядок атрибутов: клик «⇑» — атрибут становится верхней строкой карточки.
+   Сохраняется в конфигурации датчика (sensors.json) и переживает перезагрузку;
+   POST /api/config пересоздаёт датчики — то же поведение, что у правки единиц. */
+async function pushTop(sid,attr){
+  const s=cfg.sensors.find(x=>x.id===sid);
+  if(!s)return toast('⚠ Элемент не найден в конфигурации');
+  const attrs=Object.keys(tele[sid]||{});        /* атрибуты, реально приходящие в телеметрии */
+  if(attrs.length<2)return;
+  const cur=(Array.isArray(s.order)?s.order:[]).filter(a=>attrs.includes(a));
+  for(const a of attrs)if(!cur.includes(a))cur.push(a);
+  const i=cur.indexOf(attr);
+  if(i<=0)return;                                /* уже первый — сохранять нечего */
+  cur.splice(i,1);cur.unshift(attr);
+  s.order=cur;
+  const r=await POST('/api/config',{sensors:cfg.sensors});
+  if(!r)return toast('⚠ Ошибка сохранения');
+  cfg=await api('/api/config')||cfg;
+  loadTele();   /* loadTele сам вызывает render()+draw(): порядок строк и график перестроятся */
+  toast('✔ Порядок сохранён: '+attr+' — первым');
+}
+
+/* --- Единая работа с Lua-файлами: один каталог /littlefs/scripts, один список.
+   Поведение определяется хуками в файле: on_update() — расписание (привязка
+   к элементам на «Сенсорах»), on_frame(fx) — кадры светодиодов (включение
+   кнопкой «Включить» или rgb_effect('fx:имя')). Бейдж U / FX / U+FX. --- */
+let sfs=[];                                        /* файлы: name,size,hooks[],used_by[],error,last_ms,max_ms,fx_active */
+let cur={name:'',draft:false,dU:false,dR:false};   /* открытый файл; draft — черновик из шаблона */
+const urlOf=n=>'/api/scripts?name='+encodeURIComponent(n);
+/* длительность on_update(): « · 3 мс / пик 42 мс», если скрипт уже выполнялся */
+const sexec=f=>f.last_ms!=null?' · '+num(f.last_ms)+' мс'+(f.max_ms>0&&num(f.max_ms)!==num(f.last_ms)?' / пик '+num(f.max_ms):''):'';
+const hupd=f=>Array.isArray(f.hooks)&&f.hooks.includes('update');
+const hfrm=f=>Array.isArray(f.hooks)&&f.hooks.includes('frame');
+const hBadge=f=>hupd(f)&&hfrm(f)?['U+FX','h']:hupd(f)?['U','s']:hfrm(f)?['FX','f']:['–',''];
+const hTitle=f=>[hupd(f)&&'on_update (расписание)',hfrm(f)&&'on_frame (кадры LED)'].filter(Boolean).join(' + ')||'хуки не распознаны';
+async function scriptsLoad(){
+  const ls=await api('/api/scripts');
+  sfs=Array.isArray(ls)?ls:(ls&&ls.scripts)||[];
+  sfs.sort((a,b)=>a.name<b.name?-1:1);
+  const rows=sfs.map(f=>{
+    const[tx,cl]=hBadge(f);
+    return `<div class="it${cur.name===f.name?' sel':''}" data-f="${H(f.name)}"><div><div class="nm"><span class="tg ${cl}" title="${hTitle(f)}">${tx}</span>${H(f.name)}${f.fx_active?' <b style="color:var(--ac2)">▶</b>':''}</div><div class="me">${f.size} Б · ${f.used_by&&f.used_by.length?'используется: '+H(f.used_by.join(', ')):'<span style="color:var(--mu)">не привязан</span>'}${sexec(f)}</div>${f.error?'<div class="me warn">⚠ '+H(f.error)+'</div>':''}</div></div>`;
+  }).join('');
+  $('slist').innerHTML=sfs.length?rows:'<div class="empty">🗂<br>Файлов нет — создайте Lua-файл или выберите шаблон</div>';
+  /* select на вкладке «Сенсоры»: только файлы с on_update */
+  const opts=['<option value="">— выберите файл —</option>'].concat(sfs.filter(hupd).map(f=>'<option'+(cur.name===f.name&&!cur.draft?' selected':'')+'>'+H(f.name)+'</option>'));
+  $('scr').innerHTML=opts.join('');
+  setEditorMode();
+}
+$('slist').onclick=e=>{const it=e.target.closest('.it');if(it&&it.dataset.f)openFile(it.dataset.f)};
+/* адаптация панели под хуки открытого файла: бейдж, placeholder, кнопки, таб справочника.
+   Файл не выбран — «Сохранить/Включить/Тест/Удалить» и шаблоны скрыты,
+   остаётся только «＋ Lua-файл». */
+function openRef(k){
+  for(const x of $('rtabs').children)x.classList.toggle('on',x.dataset.r===k);
+  $('ref-s').style.display=k==='s'?'':'none';
+  $('ref-f').style.display=k==='f'?'':'none';
+}
+$('rtabs').onclick=e=>{const b=e.target.closest('[data-r]');if(b)openRef(b.dataset.r)};
+/* хуки открытого файла: у черновика фиксированы, у файла — из списка */
+function curHooks(){
+  if(cur.draft)return{u:cur.dU,r:cur.dR};
+  const f=sfs.find(x=>x.name===cur.name);
+  return f?{u:hupd(f),r:hfrm(f)}:{u:false,r:false};
+}
+function setEditorMode(){
+  const h=curHooks(),tg=$('ftag');
+  tg.style.display=cur.name?'':'none';
+  tg.className='tag '+(h.u&&h.r?'h':h.u?'s':h.r?'f':'');
+  tg.textContent=h.u&&h.r?'U+FX':h.u?'U':h.r?'FX':'';
+  $('sedit').placeholder=h.r&&!h.u?'function on_frame(fx) ... end':'function on_update() ... end';
+  $('ssav').style.display=cur.name?'':'none';
+  $('sfmt').style.display=(cur.name&&window.__edReady)?'':'none';   /* выравнивание — только с онлайн-редактором */
+  $('sdel').style.display=cur.name?'':'none';
+  $('srun').style.display=h.u?'':'none';           /* «Тест» — файлам с on_update */
+  $('sfex').style.display=h.r?'':'none';           /* «Включить» — файлам с on_frame */
+  $('tplrow').style.display=h.r&&!h.u?'':'none';   /* шаблоны анимаций — frame-файлам */
+  openRef(h.r&&!h.u?'f':'s');
+  updateSfxLabel();
+}
+function updateSfxLabel(){
+  const act=cur.name&&!cur.draft&&sfs.some(x=>x.name===cur.name&&x.fx_active);
+  $('sfex').textContent=act?'■ Стоп':'▶ Включить';
+}
+async function openFile(n){
+  const r=await fetch(urlOf(n));
+  if(!r.ok)return toast('⚠ Не удалось открыть '+n);
+  $('sf').textContent=n;$('sedit').value=await r.text();
+  cur={name:n,draft:false,dU:false,dR:false};
+  setEditorMode();
+  const f=sfs.find(x=>x.name===n);
+  $('sstat').textContent=f&&hfrm(f)&&!hupd(f)?'Открыт '+n+' · включение: rgb_effect("'+n.slice(0,-4)+'") или кнопка «Включить»':'Открыт '+n;
+  scriptsLoad();
+}
+$('snew').onclick=()=>{
+  let n=prompt('Имя нового Lua-файла (буквы, цифры, _ и -; .lua добавится автоматически)');
+  if(n==null)return;
+  n=n.trim().replace(/\.lua$/i,'');      /* снять введённый суффикс, если был */
+  n=n.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,40);
+  if(!n)return toast('⚠ Недопустимое имя');
+  n+='.lua';
+  if(sfs.some(f=>f.name===n))return toast('⚠ Такой файл уже существует');
+  cur={name:n,draft:true,dU:true,dR:false};$('sf').textContent=n+' (новый)';
+  $('sedit').value='-- '+n+': Lua-файл узла\n-- on_update() — по расписанию (привяжите к элементу на вкладке «Сенсоры»)\n-- хук on_frame(fx) — кадры светодиодов (включение: кнопка «Включить» или rgb_effect("fx:'+n.slice(0,-4)+'"))\n\nfunction on_update()\n  local t = sensors["esp_temp"] or {}\n  log("опрос #" .. tick)\n  return { value = t.temperature or 0 }\nend\n\n--[[ LED-анимация — раскомментируйте и приведите rgb_setup к вашему железу:\nfunction on_frame(fx)\n  if fx.frame == 1 then rgb_setup{mode="ws2812", pin=4, count=8} end\n  fx.clear(0, 0, 0)\n  fx.px(0, 0, 255, 0, 0)\nend\n]]\n';
+  setEditorMode();
+  $('sstat').textContent='Новый файл — нажмите «Сохранить»; расписание — привязка на «Сенсорах», анимация — кнопка «Включить»';
+};
+$('ssav').onclick=async()=>{
+  if(!cur.name)return toast('⚠ Сначала выберите или создайте файл');
+  const body=$('sedit').value;
+  if(!body.trim())return toast('⚠ Пустой файл — удалите его кнопкой «Удалить»');
+  $('sstat').textContent='Сохраняю…';
+  const r=await fetch(urlOf(cur.name),{method:'POST',headers:{'Content-Type':'text/plain'},body});
+  if(!r.ok)return $('sstat').textContent='⚠ Ошибка сохранения';
+  cur.draft=false;
+  await scriptsLoad();
+  const f=sfs.find(x=>x.name===cur.name);
+  $('sstat').textContent='✔ Сохранено'+(f&&hfrm(f)?'; активная анимация перечитывает файл сама (≤0.5 с)':'');
+  toast('✔ Сохранено');
+};
+$('srun').onclick=async()=>{
+  if(!cur.name)return toast('⚠ Сначала выберите файл');
+  $('sstat').textContent='Выполняю…';
+  const res=await api('/api/scripts/test?name='+encodeURIComponent(cur.name),{method:'POST'});
+  if(!res)return $('sstat').textContent='⚠ Тест не выполнен';
+  const out=[];
+  (res.logs||[]).slice(-5).forEach(l=>out.push('> '+l));
+  if(res.error)out.push('✖ '+res.error);
+  else out.push('✔ результат: '+JSON.stringify(res.result||{}));
+  $('sstat').textContent=out.join(' | ');
+};
+let sarm=0;
+$('sdel').onclick=async()=>{
+  if(!cur.name)return toast('⚠ Сначала выберите файл');
+  if(!sarm){sarm=1;setTimeout(()=>sarm=0,2600);return toast('Удалить '+cur.name+'? Нажмите ещё раз')}
+  sarm=0;
+  const r=await fetch(urlOf(cur.name),{method:'DELETE'});
+  if(!r.ok)return toast('⚠ Не удалён');
+  toast('Удалено');cur={name:'',draft:false,dU:false,dR:false};
+  $('sf').textContent='';$('sedit').value='';
+  setEditorMode();                              /* кнопки файла скрыты, пока ничего не выбрано */
+  $('sstat').textContent='Выберите файл слева или создайте новый';
+  scriptsLoad();
+};
+/* «Включить»/«Стоп» для файлов с on_frame: POST /api/rgb/effect */
+$('sfex').onclick=async()=>{
+  if(!cur.name)return toast('⚠ Сначала выберите файл');
+  const act=sfs.some(x=>x.name===cur.name&&x.fx_active);
+  const name=act?'none':cur.name.replace(/\.lua$/i,'');
+  $('sstat').textContent=act?'Останавливаю эффект…':'Включаю эффект…';
+  const r=await fetch('/api/rgb/effect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  if(!r.ok)return $('sstat').textContent='⚠ Не удалось: RGB не настроен (rgb_setup{...}) или имя недействительно';
+  $('sstat').textContent=act?'✔ Эффект остановлен':'✔ Эффект включён — правка файла подхватывается сама';
+  scriptsLoad();
+};
+const FXTPL={
+fire:[
+'-- fire.lua — пламя: heat-симуляция + палитра (C-примитивы)',
+'-- настройка RGB (rgb_setup{...}): здесь или в любом другом скрипте; включение: rgb_effect("fx:fire")',
+'local COOL  = 55   -- 0..255: охлаждение (больше — гаснет быстрее)',
+'local SPARK = 90   -- 0..255: вероятность искры в нижнем ряду за кадр',
+'local PUFF  = 40   -- 0..255: вероятность бокового дрейфа ("дыхание")',
+'',
+'function on_frame(fx)',
+'  if fx.frame == 1 then',
+'    fx.setpal{\'#000000\', \'#3b0a00\', \'#8a2500\', \'#d45500\', \'#f08c00\', \'#ffc935\', \'#fff0a0\', \'#ffffff\'}',
+'  end',
+'  local cols, rows = fx.cols, fx.rows',
+'  for i = 0, fx.count-1 do',
+'    local h = fx.heat(i) - math.random(0, COOL)',
+'    if h < 0 then h = 0 end',
+'    fx.heat_set(i, h)',
+'  end',
+'  for y = 1, rows-1 do',
+'    for x = 0, cols-1 do',
+'      local h1 = fx.heat((y-1)*cols + x)',
+'      local h2 = (y >= 2) and fx.heat((y-2)*cols + x) or 0',
+'      fx.heat_set(y*cols + x, (h1*2 + h2) // 3)',
+'    end',
+'  end',
+'  for y = 0, rows-1 do',
+'    for x = 0, cols-1 do',
+'      if math.random(0, 255) < PUFF then',
+'        local dx = x + (math.random(0,1)*2 - 1)',
+'        if dx >= 0 and dx < cols then',
+'          local a = (fx.heat(y*cols+x) + fx.heat(y*cols+dx)) // 2',
+'          fx.heat_set(y*cols+x, a)',
+'          fx.heat_set(y*cols+dx, a)',
+'        end',
+'      end',
+'    end',
+'  end',
+'  for x = 0, cols-1 do',
+'    if math.random(0, 255) < SPARK then fx.heat_set(x, 255) end',
+'  end',
+'  for y = 0, rows-1 do',
+'    for x = 0, cols-1 do',
+'      fx.pxg(x, y, fx.heat(y*cols+x) / 255)',
+'    end',
+'  end',
+'end'].join('\n'),
+aurora:[
+'-- aurora.lua — северное сияние: слои value-noise + палитра',
+'-- настройка RGB (rgb_setup{...}): здесь или в любом другом скрипте; включение: rgb_effect("fx:aurora")',
+'local SPD   = 1.0    -- скорость (0.1..3)',
+'local SCALE = 0.55   -- крупность узора (0.2..1)',
+'',
+'function on_frame(fx)',
+'  if fx.frame == 1 then',
+'    fx.setpal{\'#010208\', \'#082c4f\', \'#0b5f77\', \'#1fa88f\', \'#7cf08a\', \'#e9ffd9\'}',
+'  end',
+'  local t = fx.t * 0.00045 * SPD',
+'  for y = 0, fx.rows-1 do',
+'    local fy = (fx.rows > 1) and (y / (fx.rows-1)) or 0',
+'    local top = 1 - fy',
+'    for x = 0, fx.cols-1 do',
+'      local v1 = fx.noise2(x * SCALE, y * 0.35 + t, t)',
+'      local v2 = fx.noise2(x * SCALE * 2 + 40, y * 0.2 - t * 0.6, t * 1.7)',
+'      local m  = (v1 * 190 + v2 * 65) / 255',
+'      local h  = (m - 0.15) / 0.85; if h < 0 then h = 0 end',
+'      local sh = 0.28 + 0.72 * top * top',
+'      local r, g, b = fx.grad(h)',
+'      fx.px(x, y, r * sh, g * sh, b * sh)',
+'    end',
+'  end',
+'end'].join('\n'),
+plasma:[
+'-- plasma.lua — классическая плазма на синусах',
+'-- настройка RGB (rgb_setup{...}): здесь или в любом другом скрипте; включение: rgb_effect("fx:plasma")',
+'local SPD = 1.0',
+'',
+'function on_frame(fx)',
+'  if fx.frame == 1 then',
+'    fx.setpal{\'#120026\', \'#3b0f70\', \'#8a2be2\', \'#ff69b4\', \'#ffb347\', \'#fff7d6\'}',
+'  end',
+'  local t = fx.t * 0.002 * SPD',
+'  for y = 0, fx.rows-1 do',
+'    for x = 0, fx.cols-1 do',
+'      local v = 0',
+'        + math.sin(x * 0.7 + t)',
+'        + math.sin((y * 0.5 - t) * 1.3)',
+'        + math.sin((x + y) * 0.4 - t * 0.7)',
+'        + math.sin(math.sqrt(x*x + y*y) * 0.5 - t * 1.1)',
+'      fx.pxg(x, y, (v + 4) / 8)',
+'    end',
+'  end',
+'end'].join('\n')
+};
+document.querySelectorAll('[data-tpl]').forEach(b=>b.onclick=()=>{
+  const t=b.dataset.tpl,n=t+'.lua';
+  if(!cur.draft&&sfs.some(f=>f.name===n))return openFile(n);   /* файл уже есть — открываем */
+  cur={name:n,draft:true,dU:false,dR:true};$('sf').textContent=n+' (из шаблона)';
+  $('sedit').value=FXTPL[t]||'';setEditorMode();
+  $('sstat').textContent='Шаблон «'+t+'» — нажмите «Сохранить», затем «Включить» (или rgb_effect("fx:'+t+'") из скрипта)';
+  $('sedit').focus();
+});
+
+/* --- мониторинг «Системы»: GET /api/system опрашивается каждые 5 с,
+       пока открыта вкладка (тот же паттерн, что wifi/mqtt на 5 с) --- */
+const fmb=v=>v>=1048576?(v/1048576).toFixed(1)+' МБ':(v>=1024?Math.round(v/1024)+' КБ':v+' Б');
+const fdur=s=>{s=Math.max(0,Math.floor(s));const p=n=>String(n).padStart(2,'0');const d=Math.floor(s/86400);return (d?d+' д ':'')+p(Math.floor(s%86400/3600))+':'+p(Math.floor(s%3600/60))+':'+p(Math.floor(s%60))};
+async function sysLoad(){
+  const s=await api('/api/system');
+  if(!s)return;
+  const bar=(el,v)=>{v=Math.max(0,Math.min(100,v));el.style.width=v+'%';el.classList.toggle('hi',v>=90)};
+  $('sysup').textContent=fdur(s.uptime_s)+' · CPU '+s.cpu_freq_mhz+' МГц';
+  if(s.cpu_load<0){$('syscpu').textContent='—';bar($('scpu'),0)}    /* первое окно ещё не набрано */
+  else{$('syscpu').textContent=num(s.cpu_load)+' %';bar($('scpu'),s.cpu_load)}
+  const mp=s.mem_used_pct||0;
+  $('sysram').textContent=num(mp)+' %';bar($('sram'),mp);
+  $('sramf').textContent=fmb(s.mem_free||0);
+  $('sramm').textContent=fmb(s.mem_min_free||0);
+  $('sraml').textContent=fmb(s.mem_largest||0);
+  const fp=s.fs_total?(s.fs_used||0)*100/s.fs_total:0;
+  $('sysfs').textContent=s.fs_total?num(fp)+' %':'—';bar($('sfs'),fp);
+  $('sfsu').textContent=s.fs_total?fmb(s.fs_used||0):'—';
+  $('sfsf').textContent=s.fs_total?fmb((s.fs_total||0)-(s.fs_used||0)):'—';
+  const tl=s.tasks||[];
+  $('tklist').innerHTML=tl.length?tl.map(t=>'<div class="it"><span class="nm">'+H(t.name)+'</span><span class="me" style="text-align:right">CPU '+(t.cpu<0?'—':num(t.cpu)+' %')+' · стек '+fmb(t.stack||0)+'</span></div>').join(''):'<div class="empty">Данных о задачах нет</div>';
+  const lu=s.lua;
+  $('luast').textContent=(lu&&lu.recent_ms>=0)
+    ?'Lua: '+lu.count+' · посл. макс '+num(lu.recent_ms)+' мс ('+lu.recent_file+') · пик '+num(lu.peak_ms)+' мс ('+lu.peak_file+') · лимит 250 мс'
+    :'Lua: скрипты ещё не выполнялись';
+}
+/* --- прошивка / OTA --- */
+async function otaLoad(){
+  if(!$('oinfo'))return;   /* страховка: карточки прошивки/OTA могут отсутствовать */
+  const o=await api('/api/ota');
+  if(!o){$('oinfo').innerHTML='<div class="empty">Нет данных о прошивке</div>';return}
+  const nu=$('fwusb');if(nu)nu.style.display=o.available===false?'':'none';   /* пояснение «по USB» — только на сборках без OTA */
+  const rows=[['Версия',o.version],['Проект',o.project],['Сборка',(o.build_date||'')+' '+(o.build_time||'')],['IDF',(o.idf||'').replace(/;/g,' ')],
+    ['Активный слот',(o.running||'—')+' · '+Math.round((o.running_size||0)/1024)+' КБ'],
+    ['Свободный слот',o.next&&o.next!=='-'?o.next+' · '+Math.round((o.next_size||0)/1024)+' КБ':'—']];   /* без OTA-слотов свободного нет — «—» */
+  $('oinfo').innerHTML=rows.map(r=>'<div class="it"><span class="nm">'+H(r[0])+'</span><span class="me" style="text-align:right">'+H(r[1])+'</span></div>').join('');
+}
+/* во время OTA-загрузки и последующей перезагрузки устройство недоступно
+   ожидаемо — сердцебиение не должно показывать баннер «нет связи» */
+let otaUp=0;
+$('ofin').onchange=()=>{$('oup').disabled=!$('ofin').files.length};
+$('oup').onclick=()=>{
+  const f=$('ofin').files[0];
+  if(!f)return toast('⚠ Выберите файл .bin');
+  if(!confirm('Записать '+Math.round(f.size/1024)+' КБ в свободный OTA-слот?\nНе выключайте питание и не уходите со страницы.\nПосле прошивки устройство перезагрузится само.'))return;
+  otaUp=1;
+  $('oup').disabled=true;$('opw').style.display='';$('oprog').style.width='0';
+  $('ostat').textContent='Загрузка…';
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST','/api/ota',true);
+  xhr.upload.onprogress=e=>{if(e.lengthComputable){$('oprog').style.width=(e.loaded/e.total*100).toFixed(1)+'%';$('ostat').textContent='Загрузка '+Math.round(e.loaded/1024)+' / '+Math.round(e.total/1024)+' КБ'}};
+  xhr.onload=()=>{
+    otaUp=0;
+    if(xhr.status===200){
+      $('oprog').style.width='100%';
+      $('ostat').textContent='Прошивка записана — перезагрузка (до ~15 с)…';
+      let tries=30;
+      const wait=()=>{
+        fetch('/api/ota',{cache:'no-store'}).then(r=>{if(r.ok){toast('✔ Прошивка обновлена');setTimeout(()=>location.reload(),600);return}throw 0}).catch(()=>{
+          if(--tries>0)setTimeout(wait,1200);
+          else{$('ostat').textContent='⚠ Устройство не вернулось на связь — проверьте питание';otaUp=0}
+        });
+      };
+      setTimeout(wait,2000);
+    }else{
+      $('oup').disabled=false;
+      $('ostat').textContent='⚠ Ошибка '+xhr.status+': '+(xhr.responseText||'подробности в serial-журнале');
+    }
+  };
+  xhr.onerror=()=>{otaUp=0;$('oup').disabled=false;$('ostat').textContent='⚠ Сеть оборвалась при загрузке'};
+  xhr.send(f);
+};
+
+/* Раздел «Обновление прошивки (OTA)» показывается только на прошивках с OTA-разделами:
+   GET /api/ota отвечает available:false на сборках без OTA (таблица без ota_0/ota_1,
+   один factory-раздел) — тогда удаляется только карточка OTA-обновления, а карточка
+   «Текущая прошивка» (версия/сборка/слоты) остаётся на любых сборках, как и
+   «Мониторинг»; свободного слота нет — в ней «—» плюс пояснение «по USB» (fwusb). */
+api('/api/ota').then(o=>{
+  if(o&&o.available===false){
+    const a=$('c-ota');if(a)a.remove();                  /* прячем только обновление по воздуху */
+    const n=$('fwusb');if(n)n.style.display='';          /* пояснение «только по USB» */
+    const w=$('c-fw');if(w)w.style.gridColumn='1 / -1';  /* единственная карточка — во всю ширину */
+  }
+});
+
+/* --- serial console → консоль браузера (DevTools): WebSocket /api/log/ws.
+       httpd однопоточный, поэтому браузер сам опрашивает пустыми кадрами
+       каждые 250 мс — на каждый кадр приходят недостающие строки. --- */
+function logLine(s){
+  const m=/^([EIWDV]) \((\d+)\) ([^:]+): ?([\s\S]*)$/.exec(s);
+  if(!m)return console.log(s);
+  const cls={E:console.error,W:console.warn,D:console.debug,V:console.debug}[m[1]]||console.log;
+  const st='display:inline-block;margin-right:6px;padding:0 5px;border-radius:4px;background:#39415a;color:#cfe3ff;font:600 10px/15px ui-monospace,Menlo,Consolas,monospace';
+  cls(`%c${m[3]}%c ${m[4]||' '}`,st,'');
+}
+let lw=null,lwT=null;
+function lwOpen(){
+  try{lw=new WebSocket('ws://'+location.host+'/api/log/ws')}catch(e){setTimeout(lwOpen,3000);return}
+  lw.onopen=()=>{console.info('%c[serial] поток serial-лога подключен','color:#7c9c62;font-weight:600');clearInterval(lwT);lwT=setInterval(()=>{if(lw&&lw.readyState===1)lw.send('1')},250)};
+  lw.onmessage=e=>{(e.data||'').split('\n').forEach(l=>{if(!l)return;l[0]==='!'?console.warn(l):logLine(l)})};
+  lw.onclose=()=>{clearInterval(lwT);setTimeout(lwOpen,2000)};
+  lw.onerror=()=>{try{lw&&lw.close()}catch(_){}}
+}
+lwOpen();
+
+/* --- резервная копия: сенсоры + скрипты одним JSON-файлом --- */
+$('bkexp').onclick=async()=>{
+  const r=await api('/api/backup');
+  if(!r)return toast('⚠ Не удалось выгрузить конфигурацию');
+  const t=new Date(),p=n=>String(n).padStart(2,'0');
+  const fn='sensor_hub-config-'+t.getFullYear()+p(t.getMonth()+1)+p(t.getDate())+'-'+p(t.getHours())+p(t.getMinutes())+'.json';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(r)],{type:'application/json'}));
+  a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  $('bkstat').textContent='✔ Выгружено '+fn;
+};
+$('bkimp').onclick=()=>$('bkfin').click();
+$('bkfin').onchange=async e=>{
+  const f=e.target.files[0];
+  e.target.value='';
+  if(!f)return;
+  let s;
+  try{s=JSON.parse(await f.text())}catch(_){return toast('⚠ Файл не является корректным JSON')}
+  if(!s||s.type!=='sensor_hub_config')return toast('⚠ Это не файл конфигурации Sensor Hub');
+  const nsc=(Array.isArray(s.scripts)?s.scripts.length:0);
+  const sm=Array.isArray(s.scripts)?(nsc+' шт. из файла; лишние на устройстве будут удалены'):'без изменений (в файле нет массива scripts)';
+  if(!confirm('Применить конфигурацию из файла?\n\n· Сенсоры — перезапись настройками из файла\n· Скрипты — '+sm))return;
+  $('bkstat').textContent='Импорт…';
+  const r=await POST('/api/backup',s);
+  if(r&&r.ok){
+    let m='✔ Сенсоры восстановлены';
+    if(r.scripts_touched)m+=', скриптов записано '+(r.scripts_written||0)+(r.scripts_removed?', удалено '+r.scripts_removed:'')+(r.scripts_failed?', ошибок '+r.scripts_failed:'');
+    $('bkstat').textContent=m;toast(m);cancelForm();bootSensors();scriptsLoad();
+  }else{
+    const m='⚠ Ошибка импорта: '+(r?('сенсоры '+(r.sensors?'ок':'не восстановлены')+', скриптов записано '+(r.scripts_written||0)+', ошибок '+(r.scripts_failed||0)):'сервер отклонил файл');
+    $('bkstat').textContent=m;toast(m);
+    if(r)scriptsLoad();
+  }
+};
+
+/* --- контроль связи с контроллером: сердцебиение /api/time.
+   Опросы статусов ниже работают по таймерам и молча игнорируют сетевые
+   ошибки (остаётся последнее полученное значение). Если контроллер
+   выключили или он недоступен в сети, нужно предупредить: независимо от
+   активной вкладки раз в 3 с пингуем /api/time с таймаутом 4 с.
+   Две неудачи подряд — контроллер считается недоступным: показывается
+   баннер, точки статусов гаснут. Первый же успешный пинг возвращает
+   страницу в рабочий режим и сразу обновляет статусы и данные. --- */
+let netOff=false,beatFail=0,beatGen=0,beatTm=0;
+function setNet(off){
+  netOff=off;
+  document.body.classList.toggle('net-off',off);
+  $('nwarn').classList.toggle('on',off);
+  if(off){
+    $('hd').classList.remove('ok');$('wd').classList.remove('ok');$('md').classList.remove('ok','warn');
+    $('chip').textContent='Контроллер недоступен';
+    $('wst').textContent='Нет связи с контроллером — статусы устарели';
+    $('mst').textContent='Нет данных — нет связи с контроллером';
+    $('ttime').textContent='Нет связи с контроллером';
+    return;
+  }
+  wifiStat();mqttStat();
+  if($('p-sensors').classList.contains('on'))loadTele();
+  if($('p-conn').classList.contains('on'))timeTick();
+  if($('p-ota').classList.contains('on'))sysLoad();
+  toast('✔ Связь с контроллером восстановлена');
+}
+async function heartBeat(){
+  const gen=++beatGen;   /* новый пинг отменяет предыдущий */
+
+  clearTimeout(beatTm);
+  const ctl=new AbortController();
+  beatTm=setTimeout(()=>ctl.abort(),4000);
+  try{
+    const r=await fetch('/api/time',{cache:'no-store',signal:ctl.signal});
+    if(gen!==beatGen)return;   /* устарел — пришёл более новый вызов */
+    if(!r.ok)throw 0;
+    beatFail=0;
+    if(netOff)setNet(false);
+  }catch(_){
+    if(gen!==beatGen)return;   /* отменён новым вызовом — не считаем неудачей */
+    if(++beatFail>=2&&!netOff&&!otaUp)setNet(true);
+  }
+}
+$('nrel').onclick=()=>location.reload();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)heartBeat()});
+
+/* --- запуск --- */
+bootSensors();loadTele();scriptsLoad();wifiLoad();mqttLoad();wifiStat();mqttStat();tzLoad();
+heartBeat();setInterval(heartBeat,3000);
+api('/api/gpios').then(g=>{if(Array.isArray(g))$('gp').innerHTML=g.map(n=>'<option value="'+n+'">').join('')});
+setInterval(wifiStat,5000);
+setInterval(mqttStat,5000);
+setInterval(()=>{if($('p-conn').classList.contains('on'))timeTick()},2000);
+setInterval(()=>{if($('p-sensors').classList.contains('on'))loadTele()},2000);
+setInterval(()=>{if($('p-ota').classList.contains('on'))sysLoad()},5000);
+</script>
+<script>
+/* ==== Редактор Lua: онлайн-дополнение (подключается при наличии интернета) ====
+   CodeMirror 5.65.21 — подсветка Lua, авто-отступы, кнопка «Выровнять»;
+   luaparse 0.3.1 — live-проверка синтаксиса (Lua 5.3: // , goto, битовые оп.).
+   Файлы берутся с CDN (jsDelivr → резерв cdnjs/unpkg). Если интернета нет или
+   загрузка не удалась — редактор остаётся обычным <textarea> (как раньше),
+   всё работает и сообщение об ошибке не появляется. */
+(function(){
+'use strict';
+var CM_BASE=[ 'https://cdn.jsdelivr.net/npm/codemirror@5.65.21',
+              'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.21' ];
+var CM_MAIN=[ /* обязательные: последовательно; каждое имя — [jsDelivr, cdnjs] */
+  [['lib/codemirror.min.css','codemirror.min.css'],true],
+  [['lib/codemirror.min.js','codemirror.min.js'],false],
+  [['mode/lua/lua.min.js','mode/lua/lua.min.js'],false] ];
+var CM_EXTRA=[ /* необязательные: отказ не мешает редактору */
+  {u:['addon/display/placeholder.min.js','addon/display/placeholder.min.js']},
+  {u:['addon/edit/matchbrackets.min.js','addon/edit/matchbrackets.min.js']} ];
+var LP_U=[ 'https://cdn.jsdelivr.net/npm/luaparse@0.3.1/luaparse.min.js',
+           'https://unpkg.com/luaparse@0.3.1/luaparse.js' ];
+if(location.protocol!=='http:'&&location.protocol!=='https:')return;  /* file:// и пр. */
+if(!navigator.onLine)return;                                          /* сеть недоступна */
+
+var ed=document.getElementById('sedit');
+if(!ed||ed.__ed)return;
+ed.__ed=1;                                  /* защита от повторной инициализации */
+
+function add(url,css,cb){                   /* <link>/<script> с таймаутом 7 с */
+  var el=document.createElement(css?'link':'script');
+  if(css){el.rel='stylesheet';el.href=url}else{el.src=url}
+  el.async=false;
+  var ok=false;
+  var t=setTimeout(function(){if(!ok){ok=true;cb(false)}},7000);
+  el.onload=function(){if(!ok){ok=true;clearTimeout(t);cb(true)}};
+  el.onerror=function(){if(!ok){ok=true;clearTimeout(t);cb(false)}};
+  document.head.appendChild(el);
+}
+var ph='',cm=null,lintT=0,errLine=-1;
+
+function initEditor(){
+  if(!window.CodeMirror)return;
+  ph=(ed.placeholder||'')+'';
+  try{
+    cm=CodeMirror.fromTextArea(ed,{mode:'lua',lineNumbers:true,indentUnit:2,
+      smartIndent:true,viewportMargin:Infinity,theme:'ed',inputStyle:'textarea',
+      matchBrackets:true,placeholder:ph});
+  }catch(e){cm=null;return}
+  if(!cm)return;
+  /* Прозрачная интеграция: существующий код страницы продолжает работать через
+     #sedit — переопределяем value/placeholder/focus на экземпляре элемента. */
+  var d=null;
+  try{d=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')}catch(_){}
+  if(d&&d.get&&d.set){
+    Object.defineProperty(ed,'value',{get:function(){return cm.getValue()},
+      set:function(v){cm.setValue(v==null?'':String(v))},configurable:true});
+  }else{ /* резерв для старых браузеров: взаимная синхронизация */
+    var busy=false;
+    cm.on('change',function(){if(busy)return;busy=true;ed.value=cm.getValue();busy=false});
+    setInterval(function(){if(!busy&&ed.value!==cm.getValue())cm.setValue(ed.value)},300);
+  }
+  Object.defineProperty(ed,'placeholder',{get:function(){return ph},
+    set:function(v){ph=(v||'')+'';try{cm.setOption('placeholder',ph)}catch(_){}},configurable:true});
+  ed.focus=function(){cm.focus()};
+  window.__edReady=true;                    /* флаг видимости кнопки «Выровнять» */
+  try{if(typeof setEditorMode==='function')setEditorMode()}catch(_){}
+  cm.on('change',lint);
+  /* CM инициализирован в скрытой вкладке: при показе вкладки — перерасчёт геометрии */
+  var panel=document.getElementById('p-scripts');
+  if(panel&&window.MutationObserver){
+    new MutationObserver(function(){if(panel.classList.contains('on'))cm.refresh()})
+      .observe(panel,{attributes:true,attributeFilter:['class']});
+  }
+  var fmt=document.getElementById('sfmt');
+  if(fmt)fmt.onclick=function(){            /* авто-выравнивание всего файла */
+    var sels=cm.listSelections();
+    cm.operation(function(){
+      cm.setSelection({line:0,ch:0},{line:cm.lastLine(),ch:cm.getLine(cm.lastLine()).length});
+      cm.indentSelection('smart');
+      var last=cm.lastLine();
+      cm.setSelections(sels.map(function(s){
+        function p(x){var l=Math.min(x.line,last);return{line:l,ch:Math.min(x.ch,cm.getLine(l).length)}}
+        return{anchor:p(s.anchor),head:p(s.head)}
+      }),0,{scroll:true});
+    });
+    lint();
+  };
+  lint();
+}
+/* --- live-проверка синтаксиса (luaparse с CDN; нет сети — без линта) --- */
+function lint(){
+  if(!cm)return;
+  clearTimeout(lintT);
+  lintT=setTimeout(function(){
+    var box=document.getElementById('lerr');
+    if(!box)return;
+    var code=cm.getValue();
+    if(!code.trim()){box.style.display='none';hl(-1);return}
+    if(!window.luaparse)return;
+    var e=null;
+    try{luaparse.parse(code,{luaVersion:'5.3',locations:true})}catch(x){e=x}
+    if(!e){
+      hl(-1);box.style.display='';box.style.color='var(--ok)';
+      box.textContent='✔ Синтаксис корректен';
+      return;
+    }
+    var m=String(e.message||e);
+    var line=+e.line||0,col=+e.column||0;
+    var eof=/<eof>/.test(m);
+    var msg=eof?m.replace(/\s*near\s*'?\s*<eof>\s*'?/i,''):m;   /* «near '<eof>'» — излишне: говорит сама иконка */
+    if(!/^\[\d+:/.test(msg)&&line)msg+=' — строка '+line+(col?', столбец '+col:'');
+    hl(line-1);
+    box.style.display='';
+    box.style.color=eof?'var(--mu)':'var(--no)';
+    box.textContent=(eof?'⧗ Не завершено: ':'⚠ ')+msg;
+  },450);
+}
+function hl(line){
+  if(!cm)return;
+  if(errLine>=0){try{cm.removeLineClass(errLine,'wrap','cm-err')}catch(_){}}
+  errLine=-1;
+  if(line>=0&&line<=cm.lastLine()){
+    try{cm.addLineClass(line,'wrap','cm-err');errLine=line}catch(_){}
+  }
+}
+/* --- загрузка: обязательные файлы последовательно (с резервным CDN) ---
+   После ядра и режима — initEditor; аддоны и luaparse — параллельно, best effort. */
+(function load(i){
+  if(i>=CM_MAIN.length){
+    initEditor();extras(0);loadLP(0);
+    return;
+  }
+  (function trySrc(k){
+    if(k>=CM_MAIN[i][0].length)return;      /* не удалось — остаётся textarea */
+    add(CM_BASE[k?1:0]+'/'+CM_MAIN[i][0][k],CM_MAIN[i][1],function(ok){
+      ok?load(i+1):trySrc(k+1);
+    });
+  })(0);
+})(0);
+function extras(i){
+  if(i>=CM_EXTRA.length)return;
+  (function trySrc(k){
+    if(k>=CM_EXTRA[i].u.length){extras(i+1);return}
+    add(CM_BASE[k?1:0]+'/'+CM_EXTRA[i].u[k],false,function(ok){
+      extras(i+1);                          /* аддон не обязателен: едем дальше */
+    });
+  })(0);
+}
+function loadLP(k){
+  if(k>=LP_U.length||!cm)return;
+  add(LP_U[k],false,function(ok){
+    ok?lint():loadLP(k+1);
+  });
+}
+})();
+</script>
+</body>
+</html>

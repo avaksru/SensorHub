@@ -1,0 +1,16 @@
+# Name,     Type, SubType, Offset,   Size,     Flags
+# ESP32-C6 8 МБ flash + OTA: слоты по 3.5 МБ (0x380000), storage 500 КБ (0x7D000),
+# coredump 396 КБ (0x63000; запись дампов во flash отключена — раздел не используется).
+# NVS/PHY не двигались — настройки WiFi/MQTT/времени сохраняются.
+# ota_0 (0x20000..0x3A0000), ota_1 (0x3A0000..0x720000): обновление через web
+# (POST /api/ota) — образ пишется в свободный слот, после активации перезагрузка.
+# ВАЖНО: смещения хранилища и слотов изменились (было: слоты 3 МБ, storage 1.5 МБ,
+# coredump 384 КБ) — перепрошивка только по USB: idf.py erase-flash flash;
+# обновление по воздуху (OTA) таблицу разделов не переписывает.
+nvs,        data, nvs,      0x9000,   0x6000,
+phy_init,   data, phy,      0xf000,   0x1000,
+otadata,    data, ota,      0x10000,  0x2000,
+ota_0,      app,  ota_0,    0x20000,  0x380000,
+ota_1,      app,  ota_1,    0x3a0000, 0x380000,
+storage,    data, littlefs, 0x720000, 0x7d000,
+coredump,   data, coredump, 0x79d000, 0x63000,

@@ -1,0 +1,12 @@
+# Вариант CI: ESP32-C6, 8 МБ flash, с OTA-разделами (слоты по 3.5 МБ).
+# Таблица: partitions_c6_8mb_ota.csv — NVS/PHY/otadata + ota_0/ota_1 по 3.5 МБ
+# + storage (littlefs) 500 КБ + coredump 396 КБ.
+# Смещение хранилища изменилось: прошивка только по USB (idf.py erase-flash flash).
+# Web-интерфейс: вкладка «Система», блок OTA доступен, обновление через POST /api/ota.
+# В CI: idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.c6_8mb_ota"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_c6_8mb_ota.csv"
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+# Версия прошивки в app desc (вкладка «Система»): целевая плата — ESP32-C6,
+# 8 МБ flash, с OTA. Переопределяет строку из sdkconfig.defaults (esp32-4mb-ota).
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="ESP32-C6 8Mb OTA"

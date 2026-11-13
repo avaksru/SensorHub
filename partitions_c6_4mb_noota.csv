@@ -1,0 +1,14 @@
+# Name,     Type, SubType, Offset,   Size,     Flags
+# ESP32-C6 4 МБ flash БЕЗ OTA: все доступное место — один factory-раздел.
+# App 0x10000..0x380000 (3.44 МБ) + storage littlefs 0x380000..0x400000 (512 КБ):
+# в storage живут конфиг датчиков и скрипты Lua — раздел обязателен
+# (без него mount-ошибка дает reboot-loop, см. storage_littlefs_init).
+# otadata/ota_0/ota_1 и coredump отсутствуют: обновление по воздуху недоступно,
+# web-интерфейс прячет блок OTA на вкладке «Система» (GET /api/ota: available=false),
+# дампы паники не сохраняются.
+# NVS/PHY не двигались — настройки WiFi/MQTT/времени сохраняются.
+# Обновление прошивки — только по USB: merged-sensor_hub.bin с адреса 0x0.
+nvs,        data, nvs,      0x9000,   0x6000,
+phy_init,   data, phy,      0xf000,   0x1000,
+factory,    app,  factory,  0x10000,  0x370000,
+storage,    data, littlefs, 0x380000, 0x80000,
