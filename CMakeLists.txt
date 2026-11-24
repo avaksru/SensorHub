@@ -23,12 +23,12 @@ endif()
 # Компоненты esp-iot-solution: шина I2C и драйвера датчиков. Нужны bus_i2c и
 # адаптерам adapter_esp_iot_* / adapter_scd4x / adapter_sht4x — без этого блока
 # сборка падает на «Failed to resolve component 'i2c_bus'».
-set(EXTRA_COMPONENT_DIRS ${EXTRA_COMPONENT_DIRS}
-    $ENV{IOT_SOLUTION_PATH}/components/i2c_bus
-    $ENV{IOT_SOLUTION_PATH}/components/sensors/pressure/bme280
-    $ENV{IOT_SOLUTION_PATH}/components/sensors/humiture/aht20
-    $ENV{IOT_SOLUTION_PATH}/components/sensors/humiture/sht3x
-    $ENV{IOT_SOLUTION_PATH}/components/sensors/ntc_driver
+list(APPEND EXTRA_COMPONENT_DIRS
+    "$ENV{IOT_SOLUTION_PATH}/components/i2c_bus"
+    "$ENV{IOT_SOLUTION_PATH}/components/sensors/pressure/bme280"
+    "$ENV{IOT_SOLUTION_PATH}/components/sensors/humiture/aht20"
+    "$ENV{IOT_SOLUTION_PATH}/components/sensors/humiture/sht3x"
+    "$ENV{IOT_SOLUTION_PATH}/components/sensors/ntc_driver"
 )
 if(EXISTS "${CMAKE_SOURCE_DIR}/third_party/esp-idf-lib/components")
     list(APPEND EXTRA_COMPONENT_DIRS "${CMAKE_SOURCE_DIR}/third_party/esp-idf-lib/components")
