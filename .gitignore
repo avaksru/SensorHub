@@ -20,5 +20,6 @@ sdkconfig*.old
 
 # IDE / tooling
 .vscode/
+!.vscode/settings.json
 .cache/
 .editorconfig
