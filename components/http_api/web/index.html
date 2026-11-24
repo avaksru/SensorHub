@@ -3,187 +3,223 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Sensor Hub</title>
+<title>HOMEd Sensor Hub</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="application-name" content="HOMEd Sensor Hub">
+<meta name="apple-mobile-web-app-title" content="HOMEd Sensor Hub">
 <script>document.documentElement.dataset.theme=localStorage.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
 <style>
 *{box-sizing:border-box}
-:root{color-scheme:light;--bg:#f2f5f9;--cd:#fff;--cdt:#ffffffd9;--in:#f6f8fb;--tx:#151b26;--mu:#6a7686;--ln:#e3e8ef;--ac:#5658f2;--ac2:#8b5cf6;--acc:#5658f22b;--gl:#5658f266;--ok:#16a34a;--okc:#16a34a4d;--no:#e5484d;--sh:0 1px 2px #17233408,0 10px 30px -14px #1723342b}
-html[data-theme=dark]{color-scheme:dark;--bg:#0d1017;--cd:#151a23;--cdt:#151a23d9;--in:#10151d;--tx:#e8ecf2;--mu:#8a95a5;--ln:#262e3b;--ac:#8385ff;--ac2:#a78bfa;--acc:#8385ff2e;--gl:#8385ff59;--ok:#34d399;--okc:#34d3994d;--no:#f87171;--sh:0 10px 30px -12px #0000008c}
-body{margin:0;font:15px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--tx);-webkit-tap-highlight-color:transparent}
-header{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--cdt);backdrop-filter:blur(12px);border-bottom:1px solid var(--ln)}
-.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px}
-.brand i{width:11px;height:11px;border-radius:50%;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 0 12px var(--gl)}
-.chip{display:inline-flex;align-items:center;gap:8px;margin-left:auto;padding:6px 12px;border:1px solid var(--ln);border-radius:99px;background:var(--in);font-size:.78rem;color:var(--mu);max-width:56vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--no);transition:background .3s}
-.dot.ok{background:var(--ok);animation:pu 2.4s infinite}
-@keyframes pu{0%{box-shadow:0 0 0 0 var(--okc)}70%,100%{box-shadow:0 0 0 7px #0000}}
-.ib{flex:none;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;margin-left:4px;border:1px solid var(--ln);border-radius:11px;background:var(--in);color:var(--mu);font-size:17px;cursor:pointer;text-decoration:none;transition:.15s} .ib:hover{color:var(--tx);border-color:var(--mu)}
-.ib:hover{color:var(--ac);transform:scale(1.06)}
+html{color-scheme:light;
+    --background-main:#ffffff;
+    --background-shade:#eeeeee;
+    --background-hover:#dddddd;
+    --background-error:#ffdddd;
+    --border-loader:#888888;
+    --border-main:#cccccc;
+    --border-edge:#e6e6e6;
+    --border-shade:#eeeeee;
+    --color-main:#444444;
+    --color-shade:#888888;
+    --color-highlight:#000000;
+    --range-main:#cccccc;
+    --range-dark:#666666;
+    --range-light:#eeeeee;
+    --modal-background:rgba(0,0,0,0.5);
+    --float-background:rgba(221,221,221,0.5);
+    --highlight-main:rgba(68,68,68,0.1);
+    --highlight-error:rgba(255,64,0,0.25);
+    --box-shadow:0 2px 10px 0 rgba(127,127,127,0.25);
+    --color-success:#008000;
+    --color-warning:#fbb040;
+    --color-error:#ff4000;
+    --border-radius:5px;
+    --header-height:50px;
+    font-size:14px}
+html[data-theme=dark]{color-scheme:dark;
+    --background-main:#111111;
+    --background-shade:#222222;
+    --background-hover:#333333;
+    --background-error:#331111;
+    --border-loader:#888888;
+    --border-main:#444444;
+    --border-edge:#2a2a2a;
+    --border-shade:#222222;
+    --color-main:#cccccc;
+    --color-shade:#888888;
+    --color-highlight:#ffffff;
+    --range-main:#444444;
+    --range-dark:#222222;
+    --range-light:#cccccc;
+    --modal-background:rgba(63,63,63,0.1);
+    --float-background:rgba(51,51,51,0.5);
+    --highlight-main:rgba(204,204,204,0.1);
+    --highlight-error:rgba(255,64,0,0.25);
+    --box-shadow:0 2px 10px 0 rgba(63,63,63,0.25)}
+body{margin:0;font:14px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--background-main);color:var(--color-main);-webkit-tap-highlight-color:transparent}
+header{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:10px;height:var(--header-height);padding:0 18px;background:var(--background-shade);border-bottom:1px solid var(--border-main)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;color:var(--color-highlight)}
+.brand svg{flex:none;width:30px;height:30px}
+.brand i{display:none}
+.chip{display:inline-flex;align-items:center;gap:8px;margin-left:auto;padding:5px 11px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);font-size:.78rem;color:var(--color-shade);max-width:56vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--color-error);transition:background .3s}
+.dot.ok{background:var(--color-success);animation:pu 2.4s infinite}
+@keyframes pu{0%{box-shadow:0 0 0 0 var(--highlight-error)}70%,100%{box-shadow:0 0 0 7px transparent}}
+.ib{flex:none;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin-left:4px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-shade);font-size:16px;cursor:pointer;text-decoration:none;transition:.15s}
+.ib:hover{color:var(--color-highlight);background:var(--background-hover);border-color:var(--border-main)}
 nav{display:flex;gap:6px;max-width:960px;margin:0 auto;padding:10px 18px 0}
-nav button{flex:0 0 auto;padding:9px 15px;border:0;border-radius:11px;background:0;color:var(--mu);font:inherit;font-weight:600;cursor:pointer;transition:.15s}
-nav button:hover{color:var(--tx)}
-nav button.on{background:var(--cd);color:var(--ac);box-shadow:var(--sh)}
+nav button{flex:0 0 auto;padding:5px 11px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-shade);font:inherit;font-size:.75rem;font-weight:600;cursor:pointer;transition:.15s;text-transform:uppercase}
+nav button:hover{color:var(--color-highlight);background:var(--background-hover)}
+nav button.on{background:var(--background-shade);color:var(--color-highlight);border-color:var(--border-main)}
 main{max-width:960px;margin:0 auto;padding:16px 18px 44px;display:grid;gap:16px}
 @keyframes in{from{opacity:0;transform:translateY(6px)}}
 .panel{display:none}.panel.on{display:grid;gap:16px;animation:in .25s}
-.card h2{margin:0 0 14px;font-size:1rem;display:flex;align-items:center;justify-content:space-between;gap:8px}
-/* статус в строке заголовка карточки (WiFi/MQTT): точка состояния + краткий текст */
-.card h2 .hs{display:flex;align-items:center;gap:7px;min-width:0;font-size:.78rem;font-weight:400;color:var(--mu)}
+.card{background:var(--background-shade);border:1px solid var(--border-main);border-radius:var(--border-radius);padding:12px}
+.card h2{margin:0 0 14px;font-size:1rem;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--color-highlight)}
+.card h2 .hs{display:flex;align-items:center;gap:7px;min-width:0;font-size:.78rem;font-weight:400;color:var(--color-shade)}
 .cols{display:grid;gap:16px;grid-template-columns:1fr 1fr;align-items:start}
-/* Единая панель Lua: один каталог /littlefs/scripts, тип файла — по хукам */
 #p-scripts .cols{grid-template-columns:170px 738px;justify-content:start}
-/* бейдж хуков файла (U = on_update, FX = on_frame, U+FX = гибрид): в списке (.tg) и в заголовке редактора (.tag) */
-.tg{flex:none;display:inline-block;margin-right:7px;padding:0 5px;border-radius:6px;font-size:.68rem;font-weight:700;line-height:1.45;vertical-align:1px}
-.tg.s{background:var(--acc);color:var(--ac)}
-.tg.f{background:var(--ac2);color:#fff}
+.tg{flex:none;display:inline-block;margin-right:7px;padding:0 5px;border-radius:var(--border-radius);font-size:.68rem;font-weight:700;line-height:1.45;vertical-align:1px}
+.tg.s{background:var(--highlight-main);color:var(--color-highlight)}
+.tg.f{background:var(--color-warning);color:#000}
 .tg.h{background:#9d5cff;color:#fff}
-.tag{flex:none;margin-left:8px;padding:2px 8px;border-radius:7px;font-size:.68rem;font-weight:700}
-.tag.s{background:var(--acc);color:var(--ac)}
-.tag.f{background:var(--ac2);color:#fff}
+.tag{flex:none;margin-left:8px;padding:2px 8px;border-radius:var(--border-radius);font-size:.68rem;font-weight:700}
+.tag.s{background:var(--highlight-main);color:var(--color-highlight)}
+.tag.f{background:var(--color-warning);color:#000}
 .tag.h{background:#9d5cff;color:#fff}
 .empty.sm{padding:4px 12px;font-size:.8rem}
-/* мини-табы справочника внутри details */
 .rtabs{display:flex;gap:6px;margin-top:10px}
-.rtabs button{flex:0 0 auto;padding:5px 11px;border:1px solid var(--ln);border-radius:9px;background:var(--in);color:var(--mu);font:inherit;font-size:.75rem;font-weight:600;cursor:pointer;transition:.15s}
-.rtabs button:hover{color:var(--tx)}
-.rtabs button.on{border-color:var(--ac);color:var(--ac);background:var(--cd)}
+.rtabs button{flex:0 0 auto;padding:5px 11px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-shade);font:inherit;font-size:.75rem;font-weight:600;cursor:pointer;transition:.15s;text-transform:uppercase}
+.rtabs button:hover{color:var(--color-highlight);background:var(--background-hover)}
+.rtabs button.on{border-color:var(--color-warning);color:var(--color-highlight);background:var(--background-main)}
 .f{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.f label{display:grid;gap:5px;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mu)}
+.f label{display:grid;gap:5px;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--color-shade)}
 .f .w,.f label.sw{grid-column:1/-1}
-input,select{width:100%;min-height:42px;padding:0 12px;border:1px solid var(--ln);border-radius:11px;background:var(--in);color:var(--tx);font:inherit;transition:border-color .15s,box-shadow .15s}
-input:focus,select:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px var(--acc)}
-.f label.sw{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.9rem;font-weight:600;color:var(--tx);text-transform:none;letter-spacing:0;cursor:pointer}
+input,select{width:100%;min-height:30px;padding:0 8px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-main);font:inherit;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{outline:0;border-color:var(--color-warning);box-shadow:0 0 0 2px var(--highlight-error)}
+.f label.sw{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.9rem;font-weight:600;color:var(--color-highlight);text-transform:none;letter-spacing:0;cursor:pointer}
 .sw input{position:absolute;width:0;height:0;opacity:0}
-.tk{flex:none;width:44px;height:26px;border-radius:99px;background:var(--ln);position:relative;transition:.2s}
-.tk::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0004;transition:.2s}
-.sw input:checked+.tk{background:var(--ac)}
+.tk{flex:none;width:44px;height:26px;border-radius:99px;background:var(--range-main);position:relative;transition:.2s}
+.tk::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:.2s}
+.sw input:checked+.tk{background:var(--color-warning)}
 .sw input:checked+.tk::after{left:21px}
-.sw input:focus-visible+.tk{box-shadow:0 0 0 3px var(--acc)}
+.sw input:focus-visible+.tk{box-shadow:0 0 0 2px var(--highlight-error)}
 .act{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.b{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:0 18px;border:0;border-radius:11px;font:inherit;font-weight:600;color:#fff;cursor:pointer;background:linear-gradient(135deg,var(--ac),var(--ac2));transition:.15s}
-.b:hover{filter:brightness(1.08)}
+.b{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:30px;padding:0 14px;border:1px solid var(--border-main);border-radius:var(--border-radius);font:inherit;font-size:.8125rem;font-weight:600;text-transform:uppercase;color:var(--color-main);cursor:pointer;background:var(--background-shade);transition:.15s}
+.b:hover:enabled{background:var(--background-hover);color:var(--color-highlight)}
 .b:active{transform:scale(.97)}
-.b.gh{background:var(--in);color:var(--tx);border:1px solid var(--ln);box-shadow:none}
-.b.gh:hover{border-color:var(--ac);color:var(--ac);filter:none}
-.b.no{background:var(--no)}
-.b.no.gh{color:var(--no);background:var(--in)}
-.b.no.gh:hover{border-color:var(--no)}
+.b.gh{background:var(--background-main);color:var(--color-shade)}
+.b.gh:hover{border-color:var(--color-warning);color:var(--color-highlight)}
+.b.no{background:var(--color-error);border-color:var(--color-error);color:#fff}
+.b.no.gh{color:var(--color-error);background:var(--background-main);border-color:var(--border-main)}
+.b.no.gh:hover{border-color:var(--color-error);color:var(--color-error);background:var(--background-error)}
+.b:disabled{opacity:.5;cursor:default}
 .lst{display:grid;gap:8px}
-.it{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border:1px solid var(--ln);border-radius:12px;background:var(--in);transition:.15s}
-.it:hover{border-color:var(--ac)}
-.dot.warn{background:#f59e0b;box-shadow:0 0 10px #f59e0b4d}
-.nm{font-weight:600}
-.me{font-size:.78rem;color:var(--mu);margin-top:2px}
-.del{flex:none;width:34px;height:34px;border:0;border-radius:9px;background:0;color:var(--mu);font-size:15px;cursor:pointer;transition:.15s}
-.del:hover{color:#fff;background:var(--no)}
-.edt{flex:none;width:34px;height:34px;border:0;border-radius:9px;background:0;color:var(--mu);font-size:15px;cursor:pointer;transition:.15s}
-.edt:hover{color:#fff;background:var(--ac)}
-.ctl{flex:none;padding:4px 12px;border:1px solid var(--ln);border-radius:99px;background:var(--in);color:var(--mu);font:700 .72rem system-ui,sans-serif;cursor:pointer;transition:.15s}
-.ctl:hover{color:var(--ac);border-color:var(--ac)}
-.ctl.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.it{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 8px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);transition:.15s;cursor:pointer}
+.it:hover{border-color:var(--color-warning);background:var(--background-hover)}
+.it.sel{border-color:var(--color-warning)!important;background:var(--highlight-main)}
+.dot.warn{background:var(--color-warning);box-shadow:0 0 10px rgba(251,176,64,.4)}
+.nm{font-weight:600;color:var(--color-highlight)}
+.me{font-size:.78rem;color:var(--color-shade);margin-top:2px;line-height:1.5}
+.me.warn{color:var(--color-error)}
+.del{flex:none;width:28px;height:28px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-shade);font-size:15px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center}
+.del:hover{color:#fff;background:var(--color-error);border-color:var(--color-error)}
+.edt{flex:none;width:28px;height:28px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-shade);font-size:15px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center}
+.edt:hover{color:var(--color-highlight);background:var(--background-hover);border-color:var(--color-warning)}
+.ctl{flex:none;padding:3px 10px;border:1px solid var(--border-main);border-radius:99px;background:var(--background-main);color:var(--color-shade);font:700 .72rem system-ui,sans-serif;cursor:pointer;transition:.15s}
+.ctl:hover{color:var(--color-warning);border-color:var(--color-warning)}
+.ctl.on{background:var(--color-success);border-color:var(--color-success);color:#fff}
 .btns{flex:none;display:flex;gap:6px}
-.empty{text-align:center;color:var(--mu);padding:24px 8px;font-size:.9rem}
-.st{display:flex;align-items:center;gap:9px;margin-top:14px;padding:10px 14px;border:1px solid var(--ln);border-radius:12px;background:var(--in);font-size:.85rem;color:var(--mu)}
-.live{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em}
-.live i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pu 1.8s infinite}
-/* Единые карточки датчиков: страница «Данные» объединена со страницей «Сенсоры»,
-   заголовок карточки = id + тумблер PIN + кнопки правки/удаления */
+.empty{text-align:center;color:var(--color-shade);padding:24px 8px;font-size:.9rem}
+.st{display:flex;align-items:center;gap:9px;margin-top:14px;padding:10px 14px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);font-size:.85rem;color:var(--color-shade)}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;color:var(--color-shade);text-transform:uppercase;letter-spacing:.05em}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--color-success);animation:pu 1.8s infinite}
 .tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
-.tile{background:var(--in);border:1px solid var(--ln);border-radius:14px;padding:12px}
-.tile h4{margin:0 0 4px;font-size:.9rem;display:flex;align-items:center;gap:6px}
+.tile{background:var(--background-main);border:1px solid var(--border-main);border-radius:var(--border-radius);padding:12px}
+.tile h4{margin:0 0 4px;font-size:.9rem;display:flex;align-items:center;gap:6px;color:var(--color-highlight)}
 .tile h4 .nm{margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tile .btns{gap:2px}
-.tile .edt,.tile .del{width:30px;height:30px;font-size:13px}
-.tile.editing{border-color:var(--ac)!important}
+.tile .edt,.tile .del{width:26px;height:26px;font-size:13px}
+.tile.editing{border-color:var(--color-warning)!important;background:var(--highlight-main)}
 .tile.off{opacity:.6}
 .kv{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:.88rem}
-.kv span{color:var(--mu)}
-.kv span[data-u]{cursor:pointer;border-bottom:1px dashed var(--ln)}
-.kv span[data-u]:hover{color:var(--ac)}
-.kv b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
-/* порядок атрибутов на карточке: кнопка «⇑» — показать атрибут первым */
-.kv .ord{border:0;background:none;padding:0 0 0 7px;color:var(--mu);cursor:pointer;font-size:.82rem;font-weight:400}
-.kv .ord:hover{color:var(--ac)}
-/* виртуальный элемент «поле ввода» (INPUT): значение переменной правится на карточке */
+.kv span{color:var(--color-shade)}
+.kv span[data-u]{cursor:pointer;border-bottom:1px dashed var(--border-main)}
+.kv span[data-u]:hover{color:var(--color-warning)}
+.kv b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--color-highlight)}
+.kv .ord{border:0;background:none;padding:0 0 0 7px;color:var(--color-shade);cursor:pointer;font-size:.82rem;font-weight:400}
+.kv .ord:hover{color:var(--color-warning)}
 .vinrow{max-width:100%}
-.vin{flex:1;min-width:0;font-size:.88rem;color:var(--tx);background:var(--cd);padding:5px 9px;border-radius:8px}
-.vin::placeholder{color:var(--mu)}
-.vset{flex:none;border:1px solid var(--ln);border-radius:8px;background:var(--cd);color:var(--ac);font-size:.8rem;padding:4px 9px;cursor:pointer;transition:.15s}
-.vset:hover{border-color:var(--ac)}
+.vin{flex:1;min-width:0;font-size:.88rem;color:var(--color-main);background:var(--background-shade);padding:5px 9px;border-radius:var(--border-radius);border:1px solid var(--border-main)}
+.vin::placeholder{color:var(--color-shade)}
+.vset{flex:none;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-shade);color:var(--color-main);font-size:.8rem;font-weight:600;padding:4px 9px;cursor:pointer;transition:.15s}
+.vset:hover{border-color:var(--color-warning);color:var(--color-highlight)}
 canvas{display:block;width:100%;height:36px;margin-top:8px}
-/* Всплывающая форма «Добавить датчик / Редактирование»: по умолчанию скрыта,
-   открывается поверх карточек; закрытие — кнопка ✕, Отмена, Esc, клик по фону */
-.modal{display:none;position:fixed;inset:0;z-index:60;overflow:auto;padding:20px 18px;background:rgba(13,17,26,.5)}
+.modal{display:none;position:fixed;inset:0;z-index:60;overflow:auto;padding:20px 18px;background:var(--modal-background);backdrop-filter:blur(5px) grayscale(0.5)}
 .modal.on{display:flex}
-.mcard{margin:auto;width:100%;max-width:640px;background:var(--cd);border:1px solid var(--ln);border-radius:16px;padding:18px 20px 20px;box-shadow:var(--sh);animation:in .2s}
+.mcard{margin:auto;width:100%;max-width:640px;background:var(--background-main);border:1px solid var(--border-shade);border-radius:var(--border-radius);padding:18px 20px 20px;box-shadow:var(--box-shadow);animation:in .2s}
 .mhd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
-.mhd h2{margin:0;font-size:1rem}
+.mhd h2{margin:0;font-size:1rem;color:var(--color-highlight)}
 .mhd .ib{margin:0}
-.b.sml{min-height:34px;padding:0 14px;font-size:.85rem}
-#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,14px);padding:11px 18px;border:1px solid var(--ln);border-radius:12px;background:var(--cd);color:var(--tx);font-weight:600;font-size:.9rem;box-shadow:var(--sh);opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:92vw}
+.b.sml{min-height:30px;padding:0 14px;font-size:.85rem}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,14px);padding:10px 16px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-shade);color:var(--color-highlight);font-weight:600;font-size:.9rem;box-shadow:var(--box-shadow);opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:92vw}
 #toast.on{opacity:1;transform:translate(-50%,0)}
-textarea.ed{width:100%;min-height:340px;padding:10px;border:1px solid var(--ln);border-radius:11px;background:var(--in);color:var(--tx);font:13px/1.5 Consolas,'Cascadia Code',Menlo,monospace;resize:vertical;tab-size:4}
-textarea.ed:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px var(--acc)}
-/* Онлайн-редактор (CodeMirror с CDN): оформление под текущую тему. Пока библиотека
-   не загружена (нет интернета) действует обычный textarea.ed — стили выше. */
-div.CodeMirror{height:auto;min-height:340px;border:1px solid var(--ln);border-radius:11px;background:var(--in);color:var(--tx);font:13px/1.55 Consolas,'Cascadia Code',Menlo,monospace}
+textarea.ed{width:100%;min-height:340px;padding:10px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-main);font:13px/1.5 Consolas,'Cascadia Code',Menlo,monospace;resize:vertical;tab-size:4}
+textarea.ed:focus{outline:0;border-color:var(--color-warning);box-shadow:0 0 0 2px var(--highlight-error)}
+div.CodeMirror{height:auto;min-height:340px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-main);font:13px/1.55 Consolas,'Cascadia Code',Menlo,monospace}
 div.CodeMirror-scroll{min-height:340px;max-height:72vh}
-div.CodeMirror-focused{border-color:var(--ac);box-shadow:0 0 0 3px var(--acc)}
-div.CodeMirror .CodeMirror-gutters{background:var(--in);border-right:1px solid var(--ln)}
-div.CodeMirror .CodeMirror-linenumber{color:var(--mu)}
-div.CodeMirror .CodeMirror-cursor{border-left:1.5px solid var(--ac)}
-div.CodeMirror .CodeMirror-selected{background:var(--gl)}
-div.CodeMirror pre.CodeMirror-cursor{border-left:1.5px solid var(--ac)}
-.cm-s-ed .cm-keyword{color:var(--ac2);font-weight:600}
-.cm-s-ed .cm-builtin{color:var(--ac)}
-.cm-s-ed .cm-string{color:var(--ok)}
-.cm-s-ed .cm-comment{color:var(--mu);font-style:italic}
+div.CodeMirror-focused{border-color:var(--color-warning);box-shadow:0 0 0 2px var(--highlight-error)}
+div.CodeMirror .CodeMirror-gutters{background:var(--background-shade);border-right:1px solid var(--border-main)}
+div.CodeMirror .CodeMirror-linenumber{color:var(--color-shade)}
+div.CodeMirror .CodeMirror-cursor{border-left:1.5px solid var(--color-warning)}
+div.CodeMirror .CodeMirror-selected{background:var(--highlight-main)}
+div.CodeMirror pre.CodeMirror-cursor{border-left:1.5px solid var(--color-warning)}
+.cm-s-ed .cm-keyword{color:var(--color-warning);font-weight:600}
+.cm-s-ed .cm-builtin{color:var(--color-highlight)}
+.cm-s-ed .cm-string{color:var(--color-success)}
+.cm-s-ed .cm-comment{color:var(--color-shade);font-style:italic}
 .cm-s-ed .cm-number{color:#b06a1e}
 html[data-theme=dark] .cm-s-ed .cm-number{color:#d9a05f}
-.cm-err{background:#e5484d26;box-shadow:inset 2px 0 0 #e5484db3}
-.it.sel{border-color:var(--ac)!important}
-.mu{color:var(--mu);font-weight:400;font-size:.8rem;font-family:Consolas,monospace}
-.ref{font-size:.78rem;line-height:1.55;color:var(--mu);columns:2;column-gap:20px;margin-top:10px}
-.ref b{color:var(--tx);font-family:Consolas,monospace;font-weight:600;white-space:nowrap}
+.cm-err{background:var(--highlight-error);box-shadow:inset 2px 0 0 var(--color-error)}
+.mu{color:var(--color-shade);font-weight:400;font-size:.8rem;font-family:Consolas,monospace}
+.ref{font-size:.78rem;line-height:1.55;color:var(--color-shade);columns:2;column-gap:20px;margin-top:10px}
+.ref b{color:var(--color-highlight);font-family:Consolas,monospace;font-weight:600;white-space:nowrap}
 .ref i{font-style:normal;font-family:Consolas,monospace;opacity:.8}
 .ref div{break-inside:avoid;margin-bottom:4px}
-.warn{color:var(--no);font-size:.78rem}
-.pbar{height:12px;border-radius:99px;background:var(--in);border:1px solid var(--ln);overflow:hidden;margin-top:14px}
-.pbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .25s}
-.pbar i.hi{background:var(--no)}
-/* «Система»: мониторинг — три блока с полосами (CPU / ОЗУ / storage) */
+.warn{color:var(--color-error);font-size:.78rem}
+.pbar{height:12px;border-radius:var(--border-radius);background:var(--background-shade);border:1px solid var(--border-main);overflow:hidden;margin-top:14px}
+.pbar i{display:block;height:100%;width:0;border-radius:var(--border-radius);background:var(--color-warning);transition:width .25s}
+.pbar i.hi{background:var(--color-error)}
 .sys{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.sysbk{background:var(--in);border:1px solid var(--ln);border-radius:12px;padding:12px}
-.sysh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:.85rem;font-weight:600}
+.sysbk{background:var(--background-main);border:1px solid var(--border-main);border-radius:var(--border-radius);padding:12px}
+.sysh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:.85rem;font-weight:600;color:var(--color-highlight)}
 .sysh b{font-variant-numeric:tabular-nums;white-space:nowrap}
 .sysbk .pbar{margin-top:10px}
 .sysbk .me{margin-top:8px}
-@media(max-width:660px){.sys{grid-template-columns:1fr}}
-@media(max-width:660px){.cols,.f{grid-template-columns:1fr}header,nav{padding-left:14px;padding-right:14px}nav{padding-top:8px}nav button{flex:1;padding:9px 6px}main{padding:14px 14px 30px}.chip{font-size:.72rem}.ref{columns:1}}
-@media(max-width:1011px){#p-scripts .cols{grid-template-columns:1fr 1fr}}
-@media(max-width:660px){#p-scripts .cols{grid-template-columns:1fr}}
-/* Баннер «нет связи с контроллером» — включает heartBeat(), когда /api/time недоступен:
-   опросы статусов при этом молча возвращают null, на странице остаются предыдущие
-   данные, поэтому предупреждаем наверху и гасим цветные точки статусов */
-#nwarn{display:none;padding:12px 16px;border:1px solid var(--no);border-radius:12px;background:var(--in);color:var(--no);font-weight:600;align-items:center;gap:12px;flex-wrap:wrap}
+#nwarn{display:none;padding:12px 16px;border:1px solid var(--color-error);border-radius:var(--border-radius);background:var(--background-error);color:var(--color-error);font-weight:600;align-items:center;gap:12px;flex-wrap:wrap}
 #nwarn.on{display:flex}
-#nwarn .b{min-height:34px;padding:0 14px;font-size:.85rem;margin-left:auto}
-/* на вкладке «Сенсоры» во время потери связи бейдж live и карточки затемняются */
+#nwarn .b{min-height:30px;padding:0 14px;font-size:.85rem;margin-left:auto}
 body.net-off .live{filter:grayscale(1);opacity:.4}
 body.net-off #tiles{opacity:.55}
-/* Подсказка о смене адреса: страницу открыли с AP (192.168.4.1), а контроллер
-   получил IP по DHCP от роутера — AP закроется через несколько секунд */
-.ipsw{display:none;margin-top:10px;padding:11px 14px;border:1px solid var(--ac);border-radius:12px;background:var(--in);font-size:.9rem;line-height:1.5}
+.ipsw{display:none;margin-top:10px;padding:11px 14px;border:1px solid var(--color-warning);border-radius:var(--border-radius);background:var(--highlight-main);font-size:.9rem;line-height:1.5}
 .ipsw.on{display:block}
-.ipsw a{color:var(--ac);font-weight:700}
+.ipsw a{color:var(--color-warning);font-weight:700}
 .ipsw .mu{margin-top:6px}
+.footer{max-width:960px;margin:0 auto;padding:0 18px 18px;font-size:.78rem;color:var(--color-shade);text-align:right}
+.footer a{color:inherit;text-decoration:none}
+.footer a:hover{color:var(--color-warning)}
+@media(max-width:660px){.sys{grid-template-columns:1fr}}
+@media(max-width:660px){.cols,.f{grid-template-columns:1fr}header,nav{padding-left:14px;padding-right:14px}nav{padding-top:8px}nav button{flex:1;padding:9px 6px}main{padding:14px 14px 30px}.chip{font-size:.72rem}.ref{columns:1}.footer{text-align:center}}
+@media(max-width:1011px){#p-scripts .cols{grid-template-columns:1fr 1fr}}
+@media(max-width:660px){#p-scripts .cols{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand"><i></i>Sensor Hub</div>
+  <div class="brand"><svg viewBox="0 0 496.1 496.1" version="1.1" xmlns="http://www.w3.org/2000/svg" style="flex:none;width:30px;height:30px"><defs><style>.cls-2{fill:#fbb040}</style></defs><g><circle cx="248" cy="248" r="248" style="fill:#333"/><path class="cls-2" d="m323 146-25-25a71 71 0 0 1-100 0l-25 25a106 106 0 0 0 150 0Z"/><path class="cls-2" d="m373 196-25-25a142 142 0 0 1-200 0l-25 25a177 177 0 0 0 250 0Z"/><path class="cls-2" d="m273 96-25-25-25 25a35 35 0 0 0 50 0Z"/><path class="cls-2" d="M106 229v45a248 248 0 0 0 284 0v-45a213 213 0 0 1-284 0Z"/><path class="cls-2" d="M106 316v41a319 319 0 0 0 284 0v-41a284 284 0 0 1-284 0Z"/></g></svg><span>HOMEd Sensor Hub</span></div>
   <div class="chip"><span class="dot" id="hd"></span><span id="chip">—</span></div>
-  <a class="ib" href="https://github.com/avaksru/SensorHub/wiki/RU-Home" target="_blank" rel="noopener noreferrer" title="Wiki — документация (откроется на GitHub)">?</a>
+  <a class="ib" href="https://github.com/avaksru/SensorHub/wiki/RU-Home" target="_blank" rel="noopener noreferrer" title="Wiki">?</a>
   <button class="ib" id="ti" title="Сменить тему">☾</button>
 </header>
 <nav id="tabs">
@@ -293,7 +329,7 @@ body.net-off #tiles{opacity:.55}
           <button class="b gh" id="snew">＋ Lua-файл</button>
           <button class="b gh no" id="sdel" style="display:none;margin-left:auto">Удалить</button>
         </div>
-        <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--mu);font-size:.85rem">Справочник</summary>
+        <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--color-shade);font-size:.85rem">Справочник</summary>
           <div id="rtabs" class="rtabs"><button data-r="s" class="on">API скриптов</button><button data-r="f">Примитивы fx</button></div>
           <div id="ref-s" class="ref">
             <div><b>on_update()</b> — вызывается по poll_interval; верните <i>{ключ=число}</i> — это станет показаниями элемента</div>
@@ -834,7 +870,7 @@ async function loadTele(){
   draw();
 }
 function draw(){
-  const ac=getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+  const ac=getComputedStyle(document.documentElement).getPropertyValue('--color-warning').trim();
   for(const c of $('tiles').querySelectorAll('canvas')){
     const s=hist[c.dataset.s]||[],w=c.width=c.offsetWidth*2,h=c.height=c.offsetHeight*2,x=c.getContext('2d'),p=h*.18;
     x.clearRect(0,0,w,h);
@@ -947,7 +983,7 @@ async function scriptsLoad(){
   sfs.sort((a,b)=>a.name<b.name?-1:1);
   const rows=sfs.map(f=>{
     const[tx,cl]=hBadge(f);
-    return `<div class="it${cur.name===f.name?' sel':''}" data-f="${H(f.name)}"><div><div class="nm"><span class="tg ${cl}" title="${hTitle(f)}">${tx}</span>${H(f.name)}${f.fx_active?' <b style="color:var(--ac2)">▶</b>':''}</div><div class="me">${f.size} Б · ${f.used_by&&f.used_by.length?'используется: '+H(f.used_by.join(', ')):'<span style="color:var(--mu)">не привязан</span>'}${sexec(f)}</div>${f.error?'<div class="me warn">⚠ '+H(f.error)+'</div>':''}</div></div>`;
+    return `<div class="it${cur.name===f.name?' sel':''}" data-f="${H(f.name)}"><div><div class="nm"><span class="tg ${cl}" title="${hTitle(f)}">${tx}</span>${H(f.name)}${f.fx_active?' <b style="color:var(--color-highlight)">▶</b>':''}</div><div class="me">${f.size} Б · ${f.used_by&&f.used_by.length?'используется: '+H(f.used_by.join(', ')):'<span style="color:var(--color-shade)">не привязан</span>'}${sexec(f)}</div>${f.error?'<div class="me warn">⚠ '+H(f.error)+'</div>':''}</div></div>`;
   }).join('');
   $('slist').innerHTML=sfs.length?rows:'<div class="empty">🗂<br>Файлов нет — создайте Lua-файл или выберите шаблон</div>';
   /* select на вкладке «Сенсоры»: только файлы с on_update */
@@ -1587,7 +1623,7 @@ function lint(){
     var e=null;
     try{luaparse.parse(code,{luaVersion:'5.3',locations:true})}catch(x){e=x}
     if(!e){
-      hl(-1);box.style.display='';box.style.color='var(--ok)';
+      hl(-1);box.style.display='';box.style.color='var(--color-success)';
       box.textContent='✔ Синтаксис корректен';
       return;
     }
@@ -1598,7 +1634,7 @@ function lint(){
     if(!/^\[\d+:/.test(msg)&&line)msg+=' — строка '+line+(col?', столбец '+col:'');
     hl(line-1);
     box.style.display='';
-    box.style.color=eof?'var(--mu)':'var(--no)';
+    box.style.color=eof?'var(--color-shade)':'var(--color-error)';
     box.textContent=(eof?'⧗ Не завершено: ':'⚠ ')+msg;
   },450);
 }
@@ -1641,5 +1677,8 @@ function loadLP(k){
 }
 })();
 </script>
+<div class="footer">
+  <span>Interface: HOMEd Sensor Hub | <a href="https://wiki.homed.dev" target="_blank" rel="noopener">HOMEd Wiki</a> | <a href="https://github.com/avaksru/SensorHub" target="_blank" rel="noopener">GitHub</a></span>
+</div>
 </body>
 </html>
