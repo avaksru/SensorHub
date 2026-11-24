@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>HOMEd Sensor Hub</title>
+<title>Sensor Hub</title>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="application-name" content="HOMEd Sensor Hub">
-<meta name="apple-mobile-web-app-title" content="HOMEd Sensor Hub">
+<meta name="application-name" content="Sensor Hub">
+<meta name="apple-mobile-web-app-title" content="Sensor Hub">
 <script>document.documentElement.dataset.theme=localStorage.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')</script>
 <style>
 *{box-sizing:border-box}
@@ -36,6 +36,7 @@ html{color-scheme:light;
     --color-error:#ff4000;
     --border-radius:5px;
     --header-height:50px;
+    --logo-light:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABtUlEQVR4nO3ZwWsTQRQG8G++3VatbZEEg/Yi9lBobKHgQfovCKVn7/0PFQRP0kvpRQSrPbYRQmwkXkLRFmbTa98eNgybZIXv/W6PnZn3QngzmQ3gnFMWmi4gXryf3I+zlwcLrYkQR4gjxOWLTliMzkzPT8Y9NIkQR4gjxOWLT1k65kOz3wEhjhBHiMtnvWAx+m7OebZfhf+p58sIcYQ4QlyY9YKxf2z2APwd2gH5w9KEfzYuChs/eGLC8HjDxGzv1PoMhDhCHCEuLDphHJxMKq8GS6smZnt3rjUS4ghxhLiQOiH2P9sevh6YMNt6N9eeLX5/rXynmG0eJuUnxBHiCHGh7gLF6JvpyeLq1DzPu0e1csTeR7vnPOqYMOu89rtAHYQ4QlyY9YJx+KX0PuCXCbMXb0Odu0P2fH+mNRPiCHGEuDx1QvHn3PY4bMhW1/Ro/PmpNL5avPxgxofl9VL+H/YucDs2z7Nnb/wukIIQR4jLpw0o9xxb22nn8PJaYkUrqPxvMXWPijd2vad7Zj1CHCGOEJdPG1A+15OFxJ8aIauVLnWPIsQR4th0Ac4555xzzjmHBtwBXa9dIymNhMQAAAAASUVORK5CYII=);
     font-size:14px}
 html[data-theme=dark]{color-scheme:dark;
     --background-main:#111111;
@@ -56,12 +57,13 @@ html[data-theme=dark]{color-scheme:dark;
     --float-background:rgba(51,51,51,0.5);
     --highlight-main:rgba(204,204,204,0.1);
     --highlight-error:rgba(255,64,0,0.25);
-    --box-shadow:0 2px 10px 0 rgba(63,63,63,0.25)}
+    --box-shadow:0 2px 10px 0 rgba(63,63,63,0.25);
+    --logo-dark:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADfklEQVR4nO2bXU8TQRSGz5xdpLRVERMKRb6EC+mFiXeIV0Ylfvw+E34A/gAxxETjr0Al4StQSQ2BUIpYabe7663vW7OTveLi8Ny9u7MzQ8n5mDMz7ma1lso/9BxIP2m2Dqg/5+1O6UG++SQ0QOoZUMU4KsZRMU4Y57V5gr8OPQ1GRu6CXnq8CPrD+jpo5zSzQ3YRef8aFeOoGEfFOGFuD0AfhGmCD5TjOOrSrTLoTpJkB271GDnHeV+iQagYR8U4KsYJfQ0cmzgZoVOXK3VPqEGcxrn685l8kFD/12uBbFSMo2Kc0GfzAa+vqX1KC/CpyUnQ9XoddJKgzTMpvS8Wi6C73Qh0TO2dw/koOZGE/uUqxlExjopxXGFiAYwkpDjK6/GUbKpcHARde/gI9PTkPdC/2hegS8US6CBEt3R8dAx6b28X9MH+Ac1XMjOFiOofKsZRMY6KcdzQGPkAWn+ntD5XytUT8hlJ1AFdnZ4GXRkbx/4ps2idnoE+2NnCGZOP4LjfV0+g9wmNp2IcFeOoGMeVxh+AUSj7AFobLC49AT03OwP63eoqDuAC7I86TPviMrZ3ZLNz8/OgF2o10Gvv1/B7rlFe+wBExTgqxnFl8gH9cZX399GGp2bmQL95/RL025UVGtGz/0/7BMvLy6Dr9R+g9/f3QHcuL2m87LxAxTgqxlExTsg2z8vplN7HVAPc3doE/bmA9YFXL56D/vjpi2QNWBgcAH10fAK60TjMtPmU8g6htYvEWENUMY6KcVSME/aduaEGSYxPqjNY93dkxGetFug/0YTkOdTz9Bn6jI1v30GXh4dBT83eB7258RV0HCeZNU4V46gYR8U4YV8cHsA4PlwZBd3pYM3vpNEAnVIuXxkfy/QB7HNaF7hv8POQ4n67Dbo9WqHxqqBLxQLo7e0d0CrGUTGOinFCNsJuhPvvp5SLX7Z/g9YAc/dEMdfuUX/sI/hcYS/qZbYPb6CParVwH+GsiXuJhSE8l+iu9wYRFeOoGMcV6c5QQDW//1QISOFv6KjuPzCINtvtYh7BPuj2yB3Q580mTSe7zu+7JMR5h4pxVIyjYpww8P0mLvbYGB/mxe8jOtfnqH/u7rzZyqzjcxxP6XyCeO5AOT7vIMZRMY6KcULfFRxJ0UvEnhpikPMKj/eKD9cP+i4k8F4j3zfI9gkqxlExjl71BK6avw3oJo3WbHxQAAAAAElFTkSuQmCC)}
 body{margin:0;font:14px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--background-main);color:var(--color-main);-webkit-tap-highlight-color:transparent}
 header{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:10px;height:var(--header-height);padding:0 18px;background:var(--background-shade);border-bottom:1px solid var(--border-main)}
 .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;color:var(--color-highlight)}
-.brand svg{flex:none;width:30px;height:30px}
-.brand i{display:none}
+.brand .logo{display:inline-block;flex:none;width:30px;height:30px;background-image:var(--logo-light);background-position:center;background-size:contain;background-repeat:no-repeat;filter:drop-shadow(0 0 1px rgba(0,0,0,.55))}
+html[data-theme=dark] .brand .logo{background-image:var(--logo-dark);filter:drop-shadow(0 0 1px rgba(255,255,255,.55))}
 .chip{display:inline-flex;align-items:center;gap:8px;margin-left:auto;padding:5px 11px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);font-size:.78rem;color:var(--color-shade);max-width:56vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--color-error);transition:background .3s}
 .dot.ok{background:var(--color-success);animation:pu 2.4s infinite}
@@ -217,7 +219,7 @@ body.net-off #tiles{opacity:.55}
 </head>
 <body>
 <header>
-  <div class="brand"><svg viewBox="0 0 496.1 496.1" version="1.1" xmlns="http://www.w3.org/2000/svg" style="flex:none;width:30px;height:30px"><defs><style>.cls-2{fill:#fbb040}</style></defs><g><circle cx="248" cy="248" r="248" style="fill:#333"/><path class="cls-2" d="m323 146-25-25a71 71 0 0 1-100 0l-25 25a106 106 0 0 0 150 0Z"/><path class="cls-2" d="m373 196-25-25a142 142 0 0 1-200 0l-25 25a177 177 0 0 0 250 0Z"/><path class="cls-2" d="m273 96-25-25-25 25a35 35 0 0 0 50 0Z"/><path class="cls-2" d="M106 229v45a248 248 0 0 0 284 0v-45a213 213 0 0 1-284 0Z"/><path class="cls-2" d="M106 316v41a319 319 0 0 0 284 0v-41a284 284 0 0 1-284 0Z"/></g></svg><span>HOMEd Sensor Hub</span></div>
+  <div class="brand"><i class="logo"></i><span>Sensor Hub</span></div>
   <div class="chip"><span class="dot" id="hd"></span><span id="chip">—</span></div>
   <a class="ib" href="https://github.com/avaksru/SensorHub/wiki/RU-Home" target="_blank" rel="noopener noreferrer" title="Wiki">?</a>
   <button class="ib" id="ti" title="Сменить тему">☾</button>
@@ -1678,7 +1680,7 @@ function loadLP(k){
 })();
 </script>
 <div class="footer">
-  <span>Interface: HOMEd Sensor Hub | <a href="https://wiki.homed.dev" target="_blank" rel="noopener">HOMEd Wiki</a> | <a href="https://github.com/avaksru/SensorHub" target="_blank" rel="noopener">GitHub</a></span>
+  <span>Interface: Sensor Hub | <a href="https://github.com/avaksru/SensorHub/wiki/RU-Home" target="_blank" rel="noopener">Wiki</a> | <a href="https://github.com/avaksru/SensorHub" target="_blank" rel="noopener">GitHub</a></span>
 </div>
 </body>
 </html>
