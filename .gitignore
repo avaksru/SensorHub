@@ -23,3 +23,6 @@ sdkconfig*.old
 !.vscode/settings.json
 .cache/
 .editorconfig
+
+.agents
+.clinerules
