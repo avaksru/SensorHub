@@ -32,6 +32,8 @@ struct RecorderItem {
     uint32_t max_raw_points = 3000;  // ~2 суток
     uint32_t max_hour_points = 8760; // ~1 год
     bool enabled = true;
+    size_t raw_file_size = 0;
+    size_t hour_file_size = 0;
 };
 
 struct RecorderRawPoint {

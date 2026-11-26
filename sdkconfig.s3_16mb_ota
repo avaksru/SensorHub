@@ -1,0 +1,8 @@
+# Вариант CI: ESP32-S3, 16 МБ flash, с OTA-разделами (слоты по 6 МБ).
+# Таблица: partitions_s3_16mb_ota.csv.
+# В CI: idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.s3_16mb_ota"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_s3_16mb_ota.csv"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# Обозначение платы для версии прошивки в app desc:
+# «ESP32-S3 16Mb OTA» + «version» из firmware_version.json.
+# CONFIG_APP_PROJECT_VER_FROM_CONFIG is not set

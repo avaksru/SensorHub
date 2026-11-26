@@ -14,6 +14,11 @@
 std::vector<int> gpio_map_available(void) {
     return {0,1,2,3,4,5,6,7,8,10,11,14,15,18,19,20,21,22,23};
 }
+#elif CONFIG_IDF_TARGET_ESP32S3
+/* ESP32-S3: флеш обычно использует GPIO26–32, а GPIO19/20 заняты USB D-/D+. */
+std::vector<int> gpio_map_available(void) {
+    return {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,21,38,39,40,41,42,45,46};
+}
 #else
 std::vector<int> gpio_map_available(void) {
     return {4,5,12,13,14,15,16,17,18,19,21,22,23,25,26,27,32,33};

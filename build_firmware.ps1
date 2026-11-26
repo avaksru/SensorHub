@@ -6,7 +6,8 @@
 #   .\build_firmware.ps1                           # ESP32-C6, 8 МБ, OTA (по умолчанию)
 #   .\build_firmware.ps1 -Variant esp32c6-4mb-noota
 #   .\build_firmware.ps1 -Variant esp32-4mb-ota
-param([ValidateSet('esp32-4mb-ota','esp32c6-4mb-noota','esp32c6-8mb-ota')][string]$Variant = 'esp32c6-8mb-ota')
+#   .\build_firmware.ps1 -Variant esp32s3-16mb-ota
+param([ValidateSet('esp32-4mb-ota','esp32c6-4mb-noota','esp32c6-8mb-ota','esp32s3-16mb-ota')][string]$Variant = 'esp32c6-8mb-ota')
 
 $ErrorActionPreference = "Stop"
 & 'C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1'
@@ -16,6 +17,7 @@ switch ($Variant) {
     'esp32-4mb-ota'     { $Target = 'esp32';   $Defaults = 'sdkconfig.defaults' }
     'esp32c6-4mb-noota' { $Target = 'esp32c6'; $Defaults = 'sdkconfig.defaults;sdkconfig.c6_4mb_noota' }
     'esp32c6-8mb-ota'   { $Target = 'esp32c6'; $Defaults = 'sdkconfig.defaults;sdkconfig.c6_8mb_ota' }
+    'esp32s3-16mb-ota'  { $Target = 'esp32s3'; $Defaults = 'sdkconfig.defaults;sdkconfig.s3_16mb_ota' }
 }
 
 Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue

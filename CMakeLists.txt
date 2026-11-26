@@ -50,6 +50,7 @@ endif()
 #   esp32   + partitions.csv              → ESP32 4Mb OTA
 #   esp32c6 + partitions_c6_4mb_noota.csv → ESP32-C6 4Mb NoOTA
 #   esp32c6 + partitions_c6_8mb_ota.csv   → ESP32-C6 8Mb OTA
+#   esp32s3 + partitions_s3_16mb_ota.csv  → ESP32-S3 16Mb OTA
 # Цепочку SDKCONFIG_DEFAULTS (вариант платы) передают .github/workflows/
 # firmware.yml и build_firmware.ps1, но кнопка Build VS Code может собрать
 # и без неё, переиспользуя существующий sdkconfig, — тогда чип и таблица
@@ -113,6 +114,7 @@ endif()
 #   esp32       + partitions.csv              → «ESP32 4Mb OTA»
 #   esp32c6     + partitions_c6_8mb_ota.csv   → «ESP32-C6 8Mb OTA»
 #   esp32c6     + partitions_c6_4mb_noota.csv → «ESP32-C6 4Mb NoOTA»
+#   esp32s3     + partitions_s3_16mb_ota.csv  → «ESP32-S3 16Mb OTA»
 # Неверная комбинация чипа и таблицы — ошибка сборки с подсказкой.
 set(_fw_sdkconfig_defaults "${SDKCONFIG_DEFAULTS}")
 if(NOT _fw_sdkconfig_defaults)
@@ -189,7 +191,8 @@ if(NOT _fw_target)
     message(FATAL_ERROR
         "Не удалось определить целевой чип прошивки: IDF_TARGET не задан, "
         "sdkconfig и дефолты не содержат CONFIG_IDF_TARGET. "
-        "Передайте -DIDF_TARGET=esp32 (вариант esp32-4mb-ota) или -DIDF_TARGET=esp32c6 (варианты esp32c6-*).")
+        "Передайте -DIDF_TARGET=esp32 (вариант esp32-4mb-ota), -DIDF_TARGET=esp32c6 (варианты esp32c6-*) "
+        "или -DIDF_TARGET=esp32s3 (вариант esp32s3-16mb-ota).")
 endif()
 
 if(_fw_target STREQUAL "esp32")
@@ -213,9 +216,19 @@ elseif(_fw_target STREQUAL "esp32c6")
             "idf.sdkconfigDefaults (.vscode/settings.json). Таблица разделов сейчас: "
             "${_fw_partition} (из ${_fw_partition_src}).")
     endif()
+elseif(_fw_target STREQUAL "esp32s3")
+    if("${_fw_partition}" STREQUAL "partitions_s3_16mb_ota.csv")
+        set(FW_BOARD_NAME "ESP32-S3 16Mb OTA")
+    else()
+        message(FATAL_ERROR
+            "Для target esp32s3 нужен вариант платы: "
+            "-DSDKCONFIG_DEFAULTS=\"sdkconfig.defaults;sdkconfig.s3_16mb_ota\" "
+            "(«ESP32-S3 16Mb OTA») — как в .github/workflows/firmware.yml и build_firmware.ps1. "
+            "Таблица разделов сейчас: ${_fw_partition} (из ${_fw_partition_src}).")
+    endif()
 else()
     message(FATAL_ERROR
-        "Неподдерживаемый целевой чип «${_fw_target}»: проект собирается для esp32 и esp32c6.")
+        "Неподдерживаемый целевой чип «${_fw_target}»: проект собирается для esp32, esp32c6 и esp32s3.")
 endif()
 
 set(PROJECT_VER "${FW_VERSION} ${FW_BOARD_NAME}")

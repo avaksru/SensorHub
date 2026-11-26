@@ -432,6 +432,15 @@ esp_err_t data_recorder_save_config(void) {
 esp_err_t data_recorder_get_config(std::vector<RecorderItem> &items) {
     std::lock_guard<std::mutex> lock(s_mtx);
     items = s_items;
+    for (auto &it : items) {
+        struct stat st;
+        std::string raw_path = safe_filename(it.sensor, it.attr, "raw");
+        std::string hour_path = safe_filename(it.sensor, it.attr, "hour");
+        if (stat(raw_path.c_str(), &st) == 0 && S_ISREG(st.st_mode))
+            it.raw_file_size = (size_t)st.st_size;
+        if (stat(hour_path.c_str(), &st) == 0 && S_ISREG(st.st_mode))
+            it.hour_file_size = (size_t)st.st_size;
+    }
     return ESP_OK;
 }
 
@@ -573,11 +582,8 @@ RecorderUsage data_recorder_usage(void) {
     std::vector<RecorderItem> items;
     data_recorder_get_config(items);
     for (const auto &it : items) {
-        std::string raw_path = safe_filename(it.sensor, it.attr, "raw");
-        std::string hour_path = safe_filename(it.sensor, it.attr, "hour");
-        struct stat st;
-        if (stat(raw_path.c_str(), &st) == 0 && S_ISREG(st.st_mode)) u.raw_used += (size_t)st.st_size;
-        if (stat(hour_path.c_str(), &st) == 0 && S_ISREG(st.st_mode)) u.hour_used += (size_t)st.st_size;
+        u.raw_used += it.raw_file_size;
+        u.hour_used += it.hour_file_size;
         u.raw_total += (size_t)(sizeof(RawFileHeader) + it.max_raw_points * sizeof(RecorderRawPoint));
         u.hour_total += (size_t)(sizeof(HourFileHeader) + it.max_hour_points * sizeof(RecorderHourPoint));
     }

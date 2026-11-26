@@ -125,6 +125,10 @@ input:focus,select:focus{outline:0;border-color:var(--color-warning);box-shadow:
 .dot.warn{background:var(--color-warning);box-shadow:0 0 10px rgba(251,176,64,.4)}
 .nm{font-weight:600;color:var(--color-highlight)}
 .me{font-size:.78rem;color:var(--color-shade);margin-top:2px;line-height:1.5}
+.rec-open{flex:1;align-self:stretch;min-width:0;padding:0;border:0;border-radius:var(--border-radius);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.rec-open:focus-visible{outline:2px solid var(--color-warning);outline-offset:2px}
+.rec-open:active{opacity:.75}
+.rec-open .nm,.rec-open .me{display:block}
 .me.warn{color:var(--color-error)}
 .del{flex:none;width:28px;height:28px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-shade);font-size:15px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center}
 .del:hover{color:#fff;background:var(--color-error);border-color:var(--color-error)}
@@ -1586,14 +1590,16 @@ async function recorderLoad(){
   if(!items.length){list.innerHTML='<div class="empty">Нет записываемых параметров — нажмите 📈 у числового параметра на вкладке «Сенсоры»</div>';return}
   list.innerHTML=items.map(it=>{
     const key=H(it.sensor)+'·'+H(it.attr);
-    return '<div class="it" data-rkey="'+key+'"><div><div class="nm">'+H(it.sensor)+' · '+H(it.attr)+'</div><div class="me">интервал '+it.debounce+' с · порог '+it.threshold+(it.enabled?'':' · остановлено')+'</div></div><span class="btns"><button class="chart" title="Открыть график">📈</button><button class="del" title="Удалить подписку">✕</button></span></div>';
+    const rawSize=it.raw_file_size||0,hourSize=it.hour_file_size||0;
+    const fileSize=(rawSize+hourSize)/1024;
+    return '<div class="it" data-rkey="'+key+'"><button type="button" class="rec-open" aria-label="Открыть график '+H(it.sensor)+' '+H(it.attr)+'"><span class="nm">'+H(it.sensor)+' · '+H(it.attr)+'</span><span class="me">интервал '+it.debounce+' с · порог '+it.threshold+(it.enabled?'':' · остановлено')+' · файлы '+fileSize.toFixed(1)+' КБ (точные '+(rawSize/1024).toFixed(1)+' КБ · часовые '+(hourSize/1024).toFixed(1)+' КБ)</span></button><span class="btns"><button class="del" title="Удалить подписку" aria-label="Удалить график '+H(it.sensor)+' '+H(it.attr)+'">✕</button></span></div>';
   }).join('');
 }
 $('rlist').onclick=e=>{
   const it=e.target.closest('.it');if(!it)return;
   const [s,a]=it.dataset.rkey.split('·');
   if(e.target.closest('.del'))return delRecorder(s,a);
-  if(e.target.closest('.chart'))return openChart(s,a);
+  openChart(s,a);
 };
 async function delRecorder(s,a){
   if(!confirm('Удалить запись '+s+'.'+a+'?\nФайлы истории будут удалены безвозвратно.'))return;

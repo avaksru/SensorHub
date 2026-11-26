@@ -1,0 +1,10 @@
+# Name,     Type, SubType,  Offset,   Size,     Flags
+# ESP32-S3 16 МБ flash + OTA: два слота приложения по 6 МБ,
+# LittleFS хранилище и небольшой раздел дампов при панике.
+nvs,        data, nvs,      0x9000,   0x6000,
+phy_init,   data, phy,      0xf000,   0x1000,
+otadata,    data, ota,      0x10000,  0x2000,
+ota_0,      app,  ota_0,    0x20000,  0x600000,
+ota_1,      app,  ota_1,    0x620000, 0x600000,
+storage,    data, littlefs, 0xc20000, 0x380000,
+coredump,   data, coredump, 0xfa0000, 0x60000,

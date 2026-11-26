@@ -1287,6 +1287,8 @@ static esp_err_t recorder_config_get_handler(httpd_req_t *req) {
         cJSON_AddNumberToObject(j, "threshold", it.threshold);
         cJSON_AddNumberToObject(j, "max_raw_points", it.max_raw_points);
         cJSON_AddNumberToObject(j, "max_hour_points", it.max_hour_points);
+        cJSON_AddNumberToObject(j, "raw_file_size", (double)it.raw_file_size);
+        cJSON_AddNumberToObject(j, "hour_file_size", (double)it.hour_file_size);
         cJSON_AddBoolToObject(j, "enabled", it.enabled);
         cJSON_AddItemToArray(arr, j);
     }

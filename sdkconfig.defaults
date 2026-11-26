@@ -3,6 +3,7 @@
 # Варианты CI добавляются списком SDKCONFIG_DEFAULTS (см. .github/workflows/firmware.yml):
 #   sdkconfig.c6_4mb_noota — ESP32-C6, 4 МБ без OTA (factory 3.44 МБ, без coredump)
 #   sdkconfig.c6_8mb_ota   — ESP32-C6, 8 МБ с OTA-слотами по 3 МБ
+#   sdkconfig.s3_16mb_ota  — ESP32-S3, 16 МБ с OTA-слотами по 6 МБ
 # Порядок списка важен: файлы после базы переопределяют таблицу разделов и размер flash.
 # Версия прошивки в app desc (вкладка «Система», поле «Версия») собирается
 # в CMakeLists.txt: «version» из firmware_version.json + обозначение целевой

@@ -114,11 +114,9 @@ const AdcDescriptor *adc_shared_ensure(const SensorConfig &cfg)
         UnitEntry ne;
         adc_oneshot_unit_init_cfg_t ini = {};
         ini.unit_id = unit;
-        /* ESP32/ESP32-S2: SAR-ADC обслуживается RTC-контроллером (clk src —
-           soc_periph_adc_rtc_clk_src_t), на чипах с SARADC DIG (C6/C3/H2/S3/P4)
-           — ADC_DIGI_CLK_SRC_DEFAULT. ADC_DIGI_CLK_SRC_DEFAULT на ESP32 тоже
-           определён (для режима через I2S), поэтому условие по цели. */
-#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S2
+        /* ESP32/ESP32-S2/ESP32-S3 используют RTC-контроллер источника часов;
+           остальные чипы с SARADC DIG используют ADC_DIGI_CLK_SRC_DEFAULT. */
+#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3
         ini.clk_src = ADC_RTC_CLK_SRC_DEFAULT;
 #else
         ini.clk_src = ADC_DIGI_CLK_SRC_DEFAULT;

@@ -1154,8 +1154,8 @@ static int l_adc_read(lua_State *L) {
     if (!s_adc_h[u]) {
         adc_oneshot_unit_init_cfg_t ini = {};
         ini.unit_id = unit;
-        /* ESP32/S2: SAR-ADC через RTC-контроллер (см. adc_shared.cpp). */
-#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S2
+        /* ESP32/S2/S3: SAR-ADC через RTC-контроллер (см. adc_shared.cpp). */
+#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3
         ini.clk_src = ADC_RTC_CLK_SRC_DEFAULT;
 #else
         ini.clk_src = ADC_DIGI_CLK_SRC_DEFAULT;
