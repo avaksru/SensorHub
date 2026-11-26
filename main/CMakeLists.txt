@@ -3,5 +3,5 @@ idf_component_register(
     REQUIRES
         storage_littlefs storage_nvs app_config sensor_manager wifi_manager
         mqtt_manager http_api lua_runtime esp_http_server web_console time_sync
-        virtual_state
+        virtual_state data_recorder
 )

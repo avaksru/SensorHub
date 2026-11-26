@@ -1,5 +1,6 @@
 #include "app_config.h"
 #include "config_store.h"
+#include "data_recorder.h"
 #include "http_api.h"
 #include "lua_runtime.h"
 #include "mqtt_manager.h"
@@ -47,6 +48,10 @@ extern "C" void app_main(void)
 
     if (!manager.init(sensors_cfg)) {
         ESP_LOGE(TAG, "sensor manager init failed");
+    }
+
+    if (data_recorder_init(&manager) != ESP_OK) {
+        ESP_LOGW(TAG, "data recorder init failed");
     }
 
     ESP_ERROR_CHECK(http_api_start(&manager));  /* регистрирует события сети до старта Wi-Fi */

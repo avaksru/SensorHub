@@ -2,6 +2,7 @@
 #include "app_config.h"
 #include "bus_i2c.h"
 #include "config_store.h"
+#include "data_recorder.h"
 #include "esp_check.h"
 #include "esp_crt_bundle.h"
 #include "esp_event.h"
@@ -134,6 +135,10 @@ static esp_err_t ota_upload_handler(httpd_req_t *req);
 static esp_err_t system_status_handler(httpd_req_t *req);
 static esp_err_t backup_get_handler(httpd_req_t *req);
 static esp_err_t backup_post_handler(httpd_req_t *req);
+static esp_err_t recorder_config_get_handler(httpd_req_t *req);
+static esp_err_t recorder_config_post_handler(httpd_req_t *req);
+static esp_err_t recorder_config_delete_handler(httpd_req_t *req);
+static esp_err_t recorder_data_get_handler(httpd_req_t *req);
 static void netif_event(void *arg, esp_event_base_t base, int32_t id, void *data);
 static esp_err_t server_start_once(void);
 static void close_fd_cb(httpd_handle_t hd, int sockfd);
@@ -1263,6 +1268,217 @@ static esp_err_t rgb_effect_post_handler(httpd_req_t *req) {
     "scripts":[{"name":"myscript.lua","content":"function on_update() ..."}]}
    WiFi/MQTT в файл не входят: там секреты, а копия — про схему и логику. */
 
+/* ------------------------------------------------------------------ */
+/* Recorder: конфигурация подписок и данные графиков                  */
+/* ------------------------------------------------------------------ */
+static esp_err_t recorder_config_get_handler(httpd_req_t *req) {
+    std::vector<RecorderItem> items;
+    data_recorder_get_config(items);
+    RecorderUsage u = data_recorder_usage();
+
+    cJSON *o = cJSON_CreateObject();
+    if (!o) return httpd_resp_send_500(req);
+    cJSON *arr = cJSON_AddArrayToObject(o, "items");
+    for (const auto &it : items) {
+        cJSON *j = cJSON_CreateObject();
+        cJSON_AddStringToObject(j, "sensor", it.sensor.c_str());
+        cJSON_AddStringToObject(j, "attr", it.attr.c_str());
+        cJSON_AddNumberToObject(j, "debounce", it.debounce);
+        cJSON_AddNumberToObject(j, "threshold", it.threshold);
+        cJSON_AddNumberToObject(j, "max_raw_points", it.max_raw_points);
+        cJSON_AddNumberToObject(j, "max_hour_points", it.max_hour_points);
+        cJSON_AddBoolToObject(j, "enabled", it.enabled);
+        cJSON_AddItemToArray(arr, j);
+    }
+    cJSON_AddNumberToObject(o, "fs_total", (double)u.fs_total);
+    cJSON_AddNumberToObject(o, "fs_used", (double)u.fs_used);
+    cJSON_AddNumberToObject(o, "raw_total", (double)u.raw_total);
+    cJSON_AddNumberToObject(o, "raw_used", (double)u.raw_used);
+    cJSON_AddNumberToObject(o, "hour_total", (double)u.hour_total);
+    cJSON_AddNumberToObject(o, "hour_used", (double)u.hour_used);
+    cJSON_AddBoolToObject(o, "space_low", u.space_low);
+    char *str = cJSON_PrintUnformatted(o);
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t r = httpd_resp_send(req, str ? str : "{}", strlen(str ? str : "{}"));
+    cJSON_free(str);
+    cJSON_Delete(o);
+    return r;
+}
+
+static esp_err_t recorder_config_post_handler(httpd_req_t *req) {
+    std::string body = read_body(req, 2048);
+    cJSON *root = cJSON_Parse(body.c_str());
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid json");
+        return ESP_FAIL;
+    }
+    RecorderItem it;
+    cJSON *v;
+    if ((v = cJSON_GetObjectItem(root, "sensor")) && cJSON_IsString(v)) it.sensor = v->valuestring;
+    if ((v = cJSON_GetObjectItem(root, "attr")) && cJSON_IsString(v)) it.attr = v->valuestring;
+    if ((v = cJSON_GetObjectItem(root, "debounce")) && cJSON_IsNumber(v)) it.debounce = (uint32_t)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(root, "threshold")) && cJSON_IsNumber(v)) it.threshold = (float)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(root, "max_raw_points")) && cJSON_IsNumber(v)) it.max_raw_points = (uint32_t)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(root, "max_hour_points")) && cJSON_IsNumber(v)) it.max_hour_points = (uint32_t)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(root, "enabled")) && cJSON_IsBool(v)) it.enabled = cJSON_IsTrue(v);
+    cJSON_Delete(root);
+
+    if (it.sensor.empty() || it.attr.empty()) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "need sensor and attr");
+        return ESP_FAIL;
+    }
+    if (data_recorder_set_item(it) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "failed to save");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
+}
+
+static esp_err_t recorder_config_delete_handler(httpd_req_t *req) {
+    char q[192] = {0};
+    std::string sensor, attr;
+    if (httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK) {
+        char val[64] = {0};
+        if (httpd_query_key_value(q, "sensor", val, sizeof(val)) == ESP_OK) sensor = val;
+        if (httpd_query_key_value(q, "attr", val, sizeof(val)) == ESP_OK) attr = val;
+    }
+    if (sensor.empty() || attr.empty()) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "need ?sensor=&attr=");
+        return ESP_FAIL;
+    }
+    if (data_recorder_remove_item(sensor, attr) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "failed to remove");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
+}
+
+static uint32_t parse_uint_query(httpd_req_t *req, const char *key, uint32_t def) {
+    char q[256] = {0};
+    if (httpd_req_get_url_query_str(req, q, sizeof(q)) != ESP_OK) return def;
+    char val[32] = {0};
+    if (httpd_query_key_value(q, key, val, sizeof(val)) != ESP_OK) return def;
+    char *end = nullptr;
+    unsigned long n = strtoul(val, &end, 10);
+    return (end && *end == '\0') ? (uint32_t)n : def;
+}
+
+static esp_err_t recorder_data_get_handler(httpd_req_t *req) {
+    static constexpr uint32_t MAX_PAGE_SIZE = 256;
+    char q[256] = {0};
+    std::string sensor, attr;
+    if (httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK) {
+        char val[64] = {0};
+        if (httpd_query_key_value(q, "sensor", val, sizeof(val)) == ESP_OK) sensor = val;
+        if (httpd_query_key_value(q, "attr", val, sizeof(val)) == ESP_OK) attr = val;
+    }
+    if (sensor.empty() || attr.empty()) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "need ?sensor=&attr=");
+        return ESP_FAIL;
+    }
+    uint32_t start = parse_uint_query(req, "start", 0);
+    uint32_t end = parse_uint_query(req, "end", 0);
+    uint32_t limit = parse_uint_query(req, "limit", MAX_PAGE_SIZE);
+    uint32_t offset = parse_uint_query(req, "offset", 0);
+    if (limit == 0 || limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
+
+    uint32_t now = (uint32_t)time(nullptr);
+    bool use_hour = start && (start < now - 2 * 24 * 3600);
+
+    cJSON *o = cJSON_CreateObject();
+    if (!o) return httpd_resp_send_500(req);
+    if (!cJSON_AddStringToObject(o, "sensor", sensor.c_str()) ||
+        !cJSON_AddStringToObject(o, "attr", attr.c_str()) ||
+        !cJSON_AddBoolToObject(o, "aggregated", use_hour) ||
+        !cJSON_AddNumberToObject(o, "offset", offset) ||
+        !cJSON_AddNumberToObject(o, "limit", limit)) {
+        cJSON_Delete(o);
+        ESP_LOGE(TAG, "failed to allocate recorder data response metadata");
+        return httpd_resp_send_500(req);
+    }
+
+    std::vector<RecorderRawPoint> raw_points;
+    std::vector<RecorderHourPoint> hour_points;
+    if (use_hour) {
+        esp_err_t err = data_recorder_get_hour(sensor, attr, start, end, limit, offset, hour_points);
+        if (err != ESP_OK) {
+            cJSON_Delete(o);
+            ESP_LOGE(TAG, "failed to read recorder hour page: %s", esp_err_to_name(err));
+            return httpd_resp_send_500(req);
+        }
+    } else {
+        esp_err_t err = data_recorder_get_raw(sensor, attr, start, end, limit, offset, raw_points);
+        if (err != ESP_OK) {
+            cJSON_Delete(o);
+            ESP_LOGE(TAG, "failed to read recorder raw page: %s", esp_err_to_name(err));
+            return httpd_resp_send_500(req);
+        }
+    }
+
+    size_t point_count = use_hour ? hour_points.size() : raw_points.size();
+    if (!cJSON_AddBoolToObject(o, "has_more", point_count == limit)) {
+        cJSON_Delete(o);
+        ESP_LOGE(TAG, "failed to allocate recorder data pagination metadata");
+        return httpd_resp_send_500(req);
+    }
+    cJSON *ts = cJSON_AddArrayToObject(o, "timestamp");
+    cJSON *values = use_hour ? nullptr : cJSON_AddArrayToObject(o, "value");
+    cJSON *avg = use_hour ? cJSON_AddArrayToObject(o, "avg") : nullptr;
+    cJSON *min = use_hour ? cJSON_AddArrayToObject(o, "min") : nullptr;
+    cJSON *max = use_hour ? cJSON_AddArrayToObject(o, "max") : nullptr;
+    if (!ts || (use_hour ? (!avg || !min || !max) : !values)) {
+        cJSON_Delete(o);
+        ESP_LOGE(TAG, "failed to allocate recorder data page arrays");
+        return httpd_resp_send_500(req);
+    }
+
+    auto add_number = [](cJSON *array, double value) {
+        cJSON *number = cJSON_CreateNumber(value);
+        if (!number) return false;
+        if (!cJSON_AddItemToArray(array, number)) {
+            cJSON_Delete(number);
+            return false;
+        }
+        return true;
+    };
+    bool arrays_ok = true;
+    if (use_hour) {
+        for (const auto &pt : hour_points) {
+            if (!add_number(ts, (double)pt.timestamp) ||
+                !add_number(avg, pt.avg) || !add_number(min, pt.min) || !add_number(max, pt.max)) {
+                arrays_ok = false;
+                break;
+            }
+        }
+    } else {
+        for (const auto &pt : raw_points) {
+            if (!add_number(ts, (double)pt.timestamp) || !add_number(values, pt.value)) {
+                arrays_ok = false;
+                break;
+            }
+        }
+    }
+    if (!arrays_ok) {
+        cJSON_Delete(o);
+        ESP_LOGE(TAG, "failed to allocate recorder data page values");
+        return httpd_resp_send_500(req);
+    }
+
+    char *str = cJSON_PrintUnformatted(o);
+    if (!str) {
+        cJSON_Delete(o);
+        ESP_LOGE(TAG, "failed to serialize recorder data page");
+        return httpd_resp_send_500(req);
+    }
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t r = httpd_resp_send(req, str, strlen(str));
+    cJSON_free(str);
+    cJSON_Delete(o);
+    return r;
+}
+
 /* GET /api/backup — выгрузка текущей конфигурации */
 static esp_err_t backup_get_handler(httpd_req_t *req) {
     cJSON *o = cJSON_CreateObject();
@@ -1298,6 +1514,18 @@ static esp_err_t backup_get_handler(httpd_req_t *req) {
         free(buf);
     }
     cJSON_AddNumberToObject(o, "scripts_count", n);
+
+    /* Recorder config в backup */
+    char *rbuf = nullptr;
+    size_t rsize = 0;
+    if (storage_littlefs_read_file(STORAGE_LITTLEFS_MOUNT_POINT "/recorder.json", &rbuf, &rsize) == ESP_OK && rbuf) {
+        cJSON *rc = cJSON_Parse(rbuf);
+        if (rc) cJSON_AddItemToObject(o, "recorder", rc);
+        else cJSON_AddNullToObject(o, "recorder");
+        free(rbuf);
+    } else {
+        cJSON_AddNullToObject(o, "recorder");
+    }
 
     char *str = cJSON_PrintUnformatted(o);
     httpd_resp_set_type(req, "application/json");
@@ -1387,6 +1615,20 @@ static esp_err_t backup_post_handler(httpd_req_t *req) {
         if (written || removed) lua_runtime_reload_all();
     }
 
+    /* 3. Recorder config: если есть в backup — восстанавливаем */
+    bool recorder_ok = true;
+    cJSON *jrec = cJSON_GetObjectItem(root, "recorder");
+    if (cJSON_IsObject(jrec)) {
+        char *rs = cJSON_PrintUnformatted(jrec);
+        if (rs) {
+            if (storage_littlefs_write_file(STORAGE_LITTLEFS_MOUNT_POINT "/recorder.json", rs, strlen(rs)) != ESP_OK)
+                recorder_ok = false;
+            cJSON_free(rs);
+            /* перезагружаем конфигурацию recorder */
+            data_recorder_load_config();
+        }
+    }
+
     cJSON *res = cJSON_CreateObject();
     cJSON_AddBoolToObject(res, "ok", sensors_ok && (!touch_scripts || failed == 0));
     cJSON_AddBoolToObject(res, "sensors", sensors_ok);
@@ -1447,7 +1689,7 @@ static esp_err_t server_start_once(void) {
            /api/control и /api/ota/upgrade включены); с запасом 40 —
            /api/backup не выпадал: ранее 28 слотов не хватало и
            GET+POST /api/backup не регистрировались */
-        config.max_uri_handlers = 40;
+        config.max_uri_handlers = 44;
     config.lru_purge_enable = true;      /* вытеснять самые старые сессии при нехватке слотов */
     config.keep_alive_enable = true;     /* забирать зависшие подключения */
     config.close_fn = close_fd_cb;
@@ -1499,7 +1741,12 @@ static esp_err_t server_start_once(void) {
         {.uri = "/api/log",               .method = HTTP_GET,    .handler = web_console_log_handler, .user_ctx = nullptr},
         {.uri = "/api/log/ws",            .method = HTTP_GET,    .handler = web_console_ws_handler,  .user_ctx = nullptr, .is_websocket = true},
         /* Скан I2C-шины (web-форма датчика: пустой Адрес / кнопка 🔎 у поля) */
-        {.uri = "/api/i2c/scan",          .method = HTTP_POST,   .handler = i2c_scan_handler,      .user_ctx = nullptr},
+        {.uri = "/api/i2c/scan",          .method = HTTP_POST,   .handler = i2c_scan_handler,        .user_ctx = nullptr},
+        /* Recorder: локальное хранение истории графиков в LittleFS */
+        {.uri = "/api/recorder/config",   .method = HTTP_GET,    .handler = recorder_config_get_handler,  .user_ctx = nullptr},
+        {.uri = "/api/recorder/config",   .method = HTTP_POST,   .handler = recorder_config_post_handler, .user_ctx = nullptr},
+        {.uri = "/api/recorder/config",   .method = HTTP_DELETE, .handler = recorder_config_delete_handler, .user_ctx = nullptr},
+        {.uri = "/api/recorder/data",    .method = HTTP_GET,    .handler = recorder_data_get_handler,   .user_ctx = nullptr},
         {.uri = "/api/backup",            .method = HTTP_GET,    .handler = backup_get_handler,      .user_ctx = nullptr},
         {.uri = "/api/backup",            .method = HTTP_POST,   .handler = backup_post_handler,     .user_ctx = nullptr},
     };

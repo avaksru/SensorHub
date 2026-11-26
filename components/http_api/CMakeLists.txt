@@ -1,7 +1,7 @@
 idf_component_register(
     SRCS "http_api.cpp"
     INCLUDE_DIRS "include"
-    REQUIRES sensor_manager app_config wifi_manager mqtt_manager gpio_map lua_runtime esp_http_server cjson esp_common esp_event esp_netif esp_wifi app_update esp_app_format esp_partition web_console time_sync virtual_state bus_i2c
+    REQUIRES sensor_manager app_config wifi_manager mqtt_manager gpio_map lua_runtime esp_http_server cjson esp_common esp_event esp_netif esp_wifi app_update esp_app_format esp_partition web_console time_sync virtual_state bus_i2c data_recorder
     # heap: heap_caps_* (/api/system); esp_hw_support: esp_clk_cpu_freq; storage_littlefs: занятость ФС (/api/system)
     # esp_http_client + mbedtls (esp_crt_bundle): скачивание обновления с GitHub (POST /api/ota/upgrade)
     PRIV_REQUIRES esp_http_client mbedtls heap esp_timer esp_hw_support storage_littlefs

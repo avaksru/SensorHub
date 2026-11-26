@@ -91,8 +91,9 @@ main{max-width:960px;margin:0 auto;padding:16px 18px 44px;display:grid;gap:16px}
 .tag.f{background:var(--color-warning);color:#000}
 .tag.h{background:#9d5cff;color:#fff}
 .empty.sm{padding:4px 12px;font-size:.8rem}
-.rtabs{display:flex;gap:6px;margin-top:10px}
+.rtabs{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:10px}
 .rtabs button{flex:0 0 auto;padding:5px 11px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-shade);font:inherit;font-size:.75rem;font-weight:600;cursor:pointer;transition:.15s;text-transform:uppercase}
+.chart-load-status{min-width:0;margin-left:auto;color:var(--color-shade);font-size:.75rem;text-align:right}
 .rtabs button:hover{color:var(--color-highlight);background:var(--background-hover)}
 .rtabs button.on{border-color:var(--color-warning);color:var(--color-highlight);background:var(--background-main)}
 .f{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -129,6 +130,8 @@ input:focus,select:focus{outline:0;border-color:var(--color-warning);box-shadow:
 .del:hover{color:#fff;background:var(--color-error);border-color:var(--color-error)}
 .edt{flex:none;width:28px;height:28px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-shade);font-size:15px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center}
 .edt:hover{color:var(--color-highlight);background:var(--background-hover);border-color:var(--color-warning)}
+.chart{flex:none;width:28px;height:28px;border:1px solid var(--border-main);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-shade);font-size:15px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;margin-left:4px}
+.chart:hover{color:var(--color-warning);background:var(--background-hover);border-color:var(--color-warning)}
 .ctl{flex:none;padding:3px 10px;border:1px solid var(--border-main);border-radius:99px;background:var(--background-main);color:var(--color-shade);font:700 .72rem system-ui,sans-serif;cursor:pointer;transition:.15s}
 .ctl:hover{color:var(--color-warning);border-color:var(--color-warning)}
 .ctl.on{background:var(--color-success);border-color:var(--color-success);color:#fff}
@@ -161,6 +164,14 @@ canvas{display:block;width:100%;height:36px;margin-top:8px}
 .modal{display:none;position:fixed;inset:0;z-index:60;overflow:auto;padding:20px 18px;background:var(--modal-background);backdrop-filter:blur(5px) grayscale(0.5)}
 .modal.on{display:flex}
 .mcard{margin:auto;width:100%;max-width:640px;background:var(--background-main);border:1px solid var(--border-shade);border-radius:var(--border-radius);padding:18px 20px 20px;box-shadow:var(--box-shadow);animation:in .2s}
+.chart-card{width:min(1400px,100%);max-width:none}
+.chart-frame{position:relative;width:100%;height:clamp(320px,62dvh,720px);margin:14px 0}
+#rc{display:block;width:100%;height:100%;background:var(--background-main);border:1px solid var(--border-main);border-radius:var(--border-radius)}
+#rc.chart-interactive{cursor:grab}
+#rc.chart-interactive:active{cursor:grabbing}
+.rec-edit{width:min(520px,calc(100% - 28px));max-height:calc(100dvh - 32px);margin:auto;padding:18px 20px 20px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--border-shade);border-radius:var(--border-radius);background:var(--background-main);color:var(--color-main);box-shadow:var(--box-shadow)}
+.rec-edit::backdrop{overflow:hidden;overscroll-behavior:contain;background:var(--modal-background);backdrop-filter:blur(5px) grayscale(.5)}
+.rec-edit .f{margin-top:8px}
 .mhd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
 .mhd h2{margin:0;font-size:1rem;color:var(--color-highlight)}
 .mhd .ib{margin:0}
@@ -226,6 +237,7 @@ body.net-off #tiles{opacity:.55}
 </header>
 <nav id="tabs">
   <button data-t="sensors" class="on">Сенсоры</button>
+  <button data-t="recorder">Графики</button>
   <button data-t="scripts">Скрипты</button>
   <button data-t="conn">Подключение</button>
   <button data-t="ota">Система</button>
@@ -235,18 +247,25 @@ body.net-off #tiles{opacity:.55}
   <section id="p-sensors" class="panel on">
     <article class="card">
       <h2><span>Датчики</span><span class="hs"><button class="b sml" id="sopen">＋ Добавить датчик</button><span class="live"><i></i>live</span></span></h2>
-      <div class="me">Клик по названию параметра — задать единицы измерения (°C, %, kPa…) · ✎ — правка, ✕ — удаление (изменения сохраняются на устройстве сразу)</div>
+      <div class="me">Клик по названию параметра — задать единицы измерения (°C, %, kPa…) · 📈 — график и запись истории · ✎ — правка, ✕ — удаление (изменения сохраняются на устройстве сразу)</div>
       <div id="tiles" class="tiles"></div>
     </article>
     <article class="card">
-      <h2>Резервная копия (сенсоры + скрипты)</h2>
-      <div class="me">Один JSON-файл: текущая настройка сенсоров и содержимое всех Lua-скриптов. Импорт перезаписывает сенсоры и синхронизирует набор скриптов с файлом (лишние на устройстве будут удалены). WiFi/MQTT-пароли в файл не входят.</div>
+      <h2>Резервная копия (сенсоры + скрипты + графики)</h2>
+      <div class="me">Один JSON-файл: текущая настройка сенсоров, содержимое всех Lua-скриптов и подписки recorder. Импорт перезаписывает сенсоры и синхронизирует набор скриптов с файлом (лишние на устройстве будут удалены). WiFi/MQTT-пароли в файл не входят.</div>
       <div class="act">
         <button class="b" id="bkexp">Экспорт</button>
         <button class="b gh" id="bkimp">Импорт из файла…</button>
         <input id="bkfin" type="file" accept=".json,application/json" style="display:none">
         <span id="bkstat" class="mu" style="align-self:center"></span>
       </div>
+    </article>
+  </section>
+  <section id="p-recorder" class="panel">
+    <article class="card">
+      <h2><span>История графиков</span><span class="hs"><span id="rusage" class="mu"></span></span></h2>
+      <div class="me">Запись параметров в файловую систему устройства (LittleFS), которая не стирается при обновлении прошивки по воздуху. Точные данные хранятся ~2 суток, усреднённые по часам — до 1 года. Новые точные точки записываются на устройство раз в минуту; при внезапном отключении питания могут потеряться данные последней минуты. При нехватке места история сокращается автоматически.</div>
+      <div id="rlist" class="lst"></div>
     </article>
   </section>
   <section id="p-conn" class="panel">
@@ -448,6 +467,33 @@ body.net-off #tiles{opacity:.55}
     </div>
   </div>
 </div>
+<div id="rmodal" class="modal" role="dialog" aria-modal="true" aria-labelledby="rht">
+  <div class="mcard chart-card">
+    <div class="mhd"><h2 id="rht">График</h2><div class="btns"><button type="button" class="ib" id="rreset" title="Сбросить масштаб" aria-label="Сбросить масштаб">↺</button><button type="button" class="b sml" id="redit-open">✎ Edit</button><button type="button" class="ib" id="rx" title="Закрыть" aria-label="Закрыть график">✕</button></div></div>
+    <div class="rtabs" id="rperiod">
+      <button data-hours="2" class="on">2 ч</button><button data-hours="24">24 ч</button><button data-hours="168">7 д</button><button data-hours="720">30 д</button><button data-hours="8760">1 г</button>
+      <span id="rload-status" class="chart-load-status" role="status" aria-live="polite">Ожидание</span>
+    </div>
+    <div class="chart-frame"><canvas id="rc" role="img" aria-label="График параметра"></canvas></div>
+  </div>
+</div>
+<dialog id="redit" class="rec-edit" aria-labelledby="redit-title">
+  <div class="mhd"><h2 id="redit-title">Настройки графика</h2><button type="button" class="ib" id="redit-close" aria-label="Закрыть настройки">✕</button></div>
+  <div class="f" id="rform">
+    <label class="w">Датчик<input id="rsens" readonly></label>
+    <label class="w">Параметр<input id="rattr" readonly></label>
+    <label>Интервал записи, с<input id="rdeb" type="number" min="1" step="10" value="60" autofocus></label>
+    <label>Порог изменения<input id="rthr" type="number" min="0" step="0.1" value="0"></label>
+    <label>Точные точки<input id="rraw" type="number" min="240" step="100" value="3000"></label>
+    <label>Часовые точки<input id="rhour" type="number" min="168" step="100" value="8760"></label>
+    <label class="sw"><span>Записывать</span><input type="checkbox" id="ren" checked><i class="tk"></i></label>
+  </div>
+  <div class="act">
+    <button type="button" class="b" id="rsav">Сохранить подписку</button>
+    <button type="button" class="b gh no" id="rdel" style="display:none;margin-left:auto">Удалить запись</button>
+    <button type="button" class="b gh" id="redit-cancel">Отмена</button>
+  </div>
+</dialog>
 <div id="toast"></div>
 <script>
 'use strict';
@@ -471,6 +517,7 @@ for(const b of $('tabs').children)b.onclick=()=>{
   for(const p of document.querySelectorAll('.panel'))p.classList.toggle('on',p.id==='p-'+b.dataset.t);
   for(const c of $('tabs').children)c.classList.toggle('on',c===b);
   if(b.dataset.t==='sensors')loadTele();   /* страница «Данные» объединена с «Сенсоры» */
+  if(b.dataset.t==='recorder')recorderLoad();
   if(b.dataset.t==='scripts')scriptsLoad();
   if(b.dataset.t==='conn'){wifiStat();mqttStat();timeTick()}   /* вход на вкладку — обновляем статусы сразу */
   if(b.dataset.t==='ota'){otaLoad();sysLoad()}   /* слоты OTA + мониторинг системы */
@@ -587,7 +634,8 @@ function render(){
       if(!es.length)body='<div class="empty sm">— нет данных —</div>';
       else body=es.map(([a,v],j)=>{
         const un=typeof v==='number'?(uo[a]?' '+H(uo[a]):''):'';
-        return '<div class="kv"><span data-u data-s="'+H(s.id)+'" data-a="'+H(a)+'" title="Клик — задать единицы измерения">'+H(a)+'</span><b>'+(typeof v==='number'?num(v):H(v))+un+(es.length>1?'<button class="ord" data-top="1" data-s="'+H(s.id)+'" data-a="'+H(a)+'" title="Клик — показать атрибут первым">⇑</button>':'')+'</b></div>'+(j===0&&typeof v==='number'?'<canvas data-s="'+H(s.id)+'·'+H(a)+'"></canvas>':'');
+        const chartable=typeof v==='number';
+        return '<div class="kv"><span data-u data-s="'+H(s.id)+'" data-a="'+H(a)+'" title="Клик — задать единицы измерения">'+H(a)+'</span><b>'+(chartable?num(v):H(v))+un+(es.length>1?'<button class="ord" data-top="1" data-s="'+H(s.id)+'" data-a="'+H(a)+'" title="Клик — показать атрибут первым">⇑</button>':'')+(chartable?'<button class="chart" data-s="'+H(s.id)+'" data-a="'+H(a)+'" title="График и запись истории">📈</button>':'')+'</b></div>'+(j===0&&chartable?'<canvas data-s="'+H(s.id)+'·'+H(a)+'"></canvas>':'');
       }).join('');
     }
     return `<div class="tile${s.show===false?' off':''}${i===editI?' editing':''}"><h4><span class="nm">${H(s.id)}</span>${ctlBtn(s.id,tele)}<span class="btns"><button class="edt" data-i="${i}" title="Редактировать">✎</button><button class="del" data-i="${i}" title="Удалить">✕</button></span></h4>${meta}${body}</div>`;
@@ -919,6 +967,8 @@ $('tiles').onclick=e=>{
   /* порядок атрибутов: «⇑» на строке — атрибут наверх (проверка до data-u: кнопка живёт в строке) */
   const tp=e.target.closest('[data-top]');
   if(tp)return pushTop(tp.dataset.s,tp.dataset.a);
+  const ch=e.target.closest('.chart');
+  if(ch)return openChart(ch.dataset.s,ch.dataset.a);
   const el=e.target.closest('[data-u]');if(el)setUnit(el.dataset.s,el.dataset.a)
 };
 /* Запись значения виртуального элемента (тип INPUT) на устройстве */
@@ -1221,7 +1271,7 @@ async function sysLoad(){
   $('sysfs').textContent=s.fs_total?num(fp)+' %':'—';bar($('sfs'),fp);
   $('sfsu').textContent=s.fs_total?fmb(s.fs_used||0):'—';
   $('sfsf').textContent=s.fs_total?fmb((s.fs_total||0)-(s.fs_used||0)):'—';
-  const tl=s.tasks||[];
+  const tl=(s.tasks||[]).toSorted((a,b)=>b.cpu-a.cpu);
   $('tklist').innerHTML=tl.length?tl.map(t=>'<div class="it"><span class="nm">'+H(t.name)+'</span><span class="me" style="text-align:right">CPU '+(t.cpu<0?'—':num(t.cpu)+' %')+' · стек '+fmb(t.stack||0)+'</span></div>').join(''):'<div class="empty">Данных о задачах нет</div>';
   const lu=s.lua;
   $('luast').textContent=(lu&&lu.recent_ms>=0)
@@ -1523,6 +1573,317 @@ setInterval(()=>{if(!netOff)mqttStat()},5000);
 setInterval(()=>{if(!netOff&&$('p-conn').classList.contains('on'))timeTick()},2000);
 setInterval(()=>{if(!netOff&&$('p-sensors').classList.contains('on'))loadTele()},2000);
 setInterval(()=>{if(!netOff&&$('p-ota').classList.contains('on'))sysLoad()},5000);
+setInterval(()=>{if(!netOff&&$('p-recorder').classList.contains('on'))recorderLoad()},5000);
+
+/* --- Recorder: локальные графики из LittleFS --- */
+let recCfg={items:[]};
+async function recorderLoad(){
+  recCfg=await api('/api/recorder/config')||{items:[]};
+  const items=recCfg.items||[];
+  const u=recCfg;
+  $('rusage').textContent=(u.fs_total?('LittleFS '+(u.fs_used/u.fs_total*100).toFixed(1)+'% · '+fmb(u.fs_used)+' / '+fmb(u.fs_total)):'—')+(u.space_low?' · ⚠ мало места':'');
+  const list=$('rlist');
+  if(!items.length){list.innerHTML='<div class="empty">Нет записываемых параметров — нажмите 📈 у числового параметра на вкладке «Сенсоры»</div>';return}
+  list.innerHTML=items.map(it=>{
+    const key=H(it.sensor)+'·'+H(it.attr);
+    return '<div class="it" data-rkey="'+key+'"><div><div class="nm">'+H(it.sensor)+' · '+H(it.attr)+'</div><div class="me">интервал '+it.debounce+' с · порог '+it.threshold+(it.enabled?'':' · остановлено')+'</div></div><span class="btns"><button class="chart" title="Открыть график">📈</button><button class="del" title="Удалить подписку">✕</button></span></div>';
+  }).join('');
+}
+$('rlist').onclick=e=>{
+  const it=e.target.closest('.it');if(!it)return;
+  const [s,a]=it.dataset.rkey.split('·');
+  if(e.target.closest('.del'))return delRecorder(s,a);
+  if(e.target.closest('.chart'))return openChart(s,a);
+};
+async function delRecorder(s,a){
+  if(!confirm('Удалить запись '+s+'.'+a+'?\nФайлы истории будут удалены безвозвратно.'))return;
+  const r=await fetch('/api/recorder/config?sensor='+encodeURIComponent(s)+'&attr='+encodeURIComponent(a),{method:'DELETE'});
+  if(r&&r.ok){
+    toast('✔ Запись удалена');
+    if(chartKey===s+'·'+a){if($('redit').open)$('redit').close();closeChart();chartKey='';}
+    recorderLoad();
+  }else toast('⚠ Не удалось удалить');
+}
+let chartKey='',chartHours=2,chartRequestId=0;
+let chartInstance=null,chartLibraryPromise=null,chartLibraryFailureAt=0,chartLibraryReady=false,chartLibraryRenderFailed=false;
+const CHART_LIBRARY_URL='https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js';
+const CHART_LIBRARY_INTEGRITY='sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ';
+const CHART_ZOOM_URL='https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@3.0.2/dist/chartjs-plugin-zoom.min.js';
+const CHART_ZOOM_INTEGRITY='sha384-2Sy2OtYjj5HL+3RIPPXqceG6z7wB+96eO7Ud1ZMQiOBCNzt/WSq6zNPfwQWdtrVY';
+const CHART_DATA_PAGE_SIZE=256;
+function updateChartLoadStatus(count,elapsedMs){
+  const elapsed=Math.max(1,elapsedMs);
+  const rate=count*1000/elapsed;
+  const durationText=elapsed<1000?`${Math.round(elapsed)} мс`:`${(elapsed/1000).toLocaleString('ru-RU',{maximumFractionDigits:1})} с`;
+  const rateText=rate>=10000?`${(rate/1000).toLocaleString('ru-RU',{maximumFractionDigits:1})} тыс.`:rate.toLocaleString('ru-RU',{maximumFractionDigits:rate<100?1:0});
+  $('rload-status').textContent=`Загружено ${count.toLocaleString('ru-RU')} точек · ${durationText} · ${rateText} точек/с`;
+}
+function destroyChart(){
+  if(chartInstance){chartInstance.destroy();chartInstance=null;}
+  $('rc').classList.remove('chart-interactive');
+}
+function loadChartScript(url,integrity,isReady){
+  return new Promise(resolve=>{
+    const script=document.createElement('script');
+    let settled=false;
+    const timeout=setTimeout(()=>finish(false),7000);
+    function finish(loaded){
+      if(settled)return;
+      settled=true;
+      clearTimeout(timeout);
+      if(!loaded)script.remove();
+      resolve(loaded&&isReady());
+    }
+    script.src=url;
+    script.integrity=integrity;
+    script.crossOrigin='anonymous';
+    script.referrerPolicy='no-referrer';
+    script.async=true;
+    script.onload=()=>finish(true);
+    script.onerror=()=>finish(false);
+    document.head.appendChild(script);
+  });
+}
+function loadChartLibrary(){
+  if(window.Chart&&window.ChartZoom){chartLibraryReady=true;return Promise.resolve(true);}
+  if(chartLibraryPromise)return chartLibraryPromise;
+  if(location.protocol!=='http:'&&location.protocol!=='https:')return Promise.resolve(false);
+  if(Date.now()-chartLibraryFailureAt<30000)return Promise.resolve(false);
+  chartLibraryPromise=(async()=>{
+    const chartLoaded=window.Chart||await loadChartScript(CHART_LIBRARY_URL,CHART_LIBRARY_INTEGRITY,()=>!!window.Chart);
+    if(!chartLoaded)return false;
+    const zoomLoaded=window.ChartZoom||await loadChartScript(CHART_ZOOM_URL,CHART_ZOOM_INTEGRITY,()=>!!window.ChartZoom);
+    return !!zoomLoaded;
+  })().then(loaded=>{
+    chartLibraryReady=loaded;
+    if(!loaded){
+      chartLibraryFailureAt=Date.now();
+      console.warn('Chart.js zoom plugin is unavailable; using the Canvas chart');
+    }
+    chartLibraryPromise=null;
+    return loaded;
+  },err=>{
+    chartLibraryPromise=null;
+    chartLibraryFailureAt=Date.now();
+    console.error('Failed to initialize Chart.js zoom plugin',err);
+    return false;
+  });
+  return chartLibraryPromise;
+}
+function chartMessage(c,text,color,fontSize=20){
+  destroyChart();
+  const w=c.width=c.offsetWidth*2,h=c.height=c.offsetHeight*2,x=c.getContext('2d');
+  x.clearRect(0,0,w,h);x.fillStyle=color;x.textAlign='center';x.font=fontSize+'px system-ui,sans-serif';x.fillText(text,w/2,h/2);
+}
+function formatChartTime(timestamp,start,end){
+  const d=new Date(timestamp*1000);
+  const pad=value=>String(value).padStart(2,'0');
+  if(end-start>90*86400)return pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'+String(d.getFullYear()).slice(-2);
+  if(end-start>86400)return pad(d.getDate())+'.'+pad(d.getMonth()+1);
+  return d.getHours()+':'+pad(d.getMinutes());
+}
+function drawCanvasChart(c,data,tc,ac,grid,start,end){
+  destroyChart();
+  const x=c.getContext('2d');
+  const w=c.width=c.offsetWidth*2,h=c.height=c.offsetHeight*2;
+  x.clearRect(0,0,w,h);
+  const ts=data.timestamp;
+  const vals=data.aggregated?data.avg:data.value;
+  const mins=data.aggregated?data.min:vals;
+  const maxs=data.aggregated?data.max:vals;
+  let mn=Math.min(...mins),mx=Math.max(...maxs);
+  if(mn===mx){mn-=1;mx+=1;}
+  const tickCount=4;
+  const tickStep=(mx-mn)/tickCount;
+  const tickDigits=tickStep>0?Math.max(0,Math.min(6,Math.ceil(-Math.log10(tickStep))+1)):2;
+  const tickLabels=Array.from({length:tickCount+1},(_,i)=>
+    Number((mx-(mx-mn)*i/tickCount).toFixed(tickDigits)).toString());
+  x.font='18px system-ui,sans-serif';
+  const left=Math.ceil(Math.max(...tickLabels.map(label=>x.measureText(label).width))+12);
+  const right=28,top=16,bottom=28;
+  const plotWidth=w-left-right,plotHeight=h-top-bottom;
+  const X=i=>ts.length>1?left+plotWidth*i/(ts.length-1):left+plotWidth/2;
+  const Y=v=>top+plotHeight*(1-(v-mn)/(mx-mn));
+  x.strokeStyle=grid;
+  x.lineWidth=1;x.globalAlpha=.5;
+  for(let i=0;i<=tickCount;i++){
+    const y=top+plotHeight*i/tickCount;
+    x.beginPath();x.moveTo(left,y);x.lineTo(w-right,y);x.stroke();
+  }
+  x.globalAlpha=1;
+  x.fillStyle=tc;x.textAlign='right';
+  for(let i=0;i<=tickCount;i++){
+    const y=top+plotHeight*i/tickCount;
+    x.fillText(tickLabels[i],left-8,y+6);
+  }
+  if(!data.aggregated){
+    x.strokeStyle=ac;x.lineWidth=3;x.lineJoin='round';x.beginPath();
+    vals.forEach((v,i)=>i?x.lineTo(X(i),Y(v)):x.moveTo(X(0),Y(v)));
+    x.stroke();
+  }else{
+    x.fillStyle=ac+'33';x.beginPath();
+    vals.forEach((v,i)=>i?x.lineTo(X(i),Y(v)):x.moveTo(X(0),Y(v)));
+    for(let i=maxs.length-1;i>=0;i--)x.lineTo(X(i),Y(mins[i]));
+    x.closePath();x.fill();
+    x.strokeStyle=ac;x.lineWidth=3;x.beginPath();
+    vals.forEach((v,i)=>i?x.lineTo(X(i),Y(v)):x.moveTo(X(0),Y(v)));
+    x.stroke();
+  }
+  x.fillStyle=tc;x.font='18px system-ui,sans-serif';x.textAlign='center';
+  for(let i=0;i<=4;i++){const idx=Math.round(i*ts.length/4);if(idx<ts.length)x.fillText(formatChartTime(ts[idx],start,end),X(idx),h-4);}
+}
+function drawChartJs(c,data,tc,ac,grid,start,end){
+  const ts=data.timestamp;
+  const vals=data.aggregated?data.avg:data.value;
+  const mins=data.aggregated?data.min:vals;
+  const maxs=data.aggregated?data.max:vals;
+  const mn=Math.min(...mins),mx=Math.max(...maxs);
+  const tickStep=(mx-mn)/4;
+  const tickDigits=tickStep>0?Math.max(0,Math.min(6,Math.ceil(-Math.log10(tickStep))+1)):2;
+  const formatTime=value=>formatChartTime(Number(value)/1000,start,end);
+  const points=values=>values.map((y,i)=>({x:ts[i]*1000,y}));
+  const line={pointRadius:ts.length===1?3:0,pointHoverRadius:4,pointHitRadius:8,borderWidth:1.5,tension:0,spanGaps:false,parsing:false};
+  const datasets=data.aggregated?[
+    {label:'Мин.',data:points(mins),borderColor:'transparent',borderWidth:0,pointRadius:0,fill:false,parsing:false},
+    {label:'Макс.',data:points(maxs),borderColor:'transparent',borderWidth:0,pointRadius:0,backgroundColor:ac+'33',fill:{target:0},parsing:false},
+    {label:'Среднее',data:points(vals),borderColor:ac,...line}
+  ]:[{label:'Значение',data:points(vals),borderColor:ac,...line}];
+  const options={
+    responsive:true,maintainAspectRatio:false,animation:false,normalized:true,
+    interaction:{mode:'nearest',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{title:items=>items.length?formatTime(items[0].parsed.x):''}},
+      zoom:{
+        limits:{x:{min:start*1000,max:end*1000,minRange:data.aggregated?3600000:5000}},
+        pan:{enabled:true,mode:'x',threshold:5},
+        zoom:{mode:'x',wheel:{enabled:true,speed:0.1}}
+      }
+    },
+    scales:{
+      x:{type:'linear',min:start*1000,max:end*1000,ticks:{color:tc,maxTicksLimit:5,callback:formatTime},grid:{display:false}},
+      y:{ticks:{color:tc,maxTicksLimit:5,precision:tickDigits,callback:value=>String(Number(Number(value).toFixed(tickDigits)))},
+        grid:{color:grid+'80'}}
+    }
+  };
+  if(chartInstance){
+    chartInstance.data.datasets=datasets;
+    chartInstance.options=options;
+    chartInstance.update('none');
+  }else{
+    chartInstance=new window.Chart(c.getContext('2d'),{type:'line',data:{datasets},options});
+  }
+  c.classList.add('chart-interactive');
+}
+function renderChart(c,data,tc,ac,grid,start,end){
+  if(chartLibraryReady&&!chartLibraryRenderFailed){
+    try{drawChartJs(c,data,tc,ac,grid,start,end);return;}
+    catch(err){
+      chartLibraryRenderFailed=true;
+      destroyChart();
+      console.error('Chart.js rendering failed; using the Canvas chart',err);
+    }
+  }
+  drawCanvasChart(c,data,tc,ac,grid,start,end);
+}
+async function loadChartData(s,a,start,end,requestId){
+  const pages=[];
+  const fields=['timestamp'];
+  const startedAt=performance.now();
+  let offset=0,aggregated=null;
+  $('rload-status').textContent='Загрузка истории…';
+  for(;;){
+    if(requestId!==chartRequestId)return null;
+    const query=new URLSearchParams({sensor:s,attr:a,start:String(start),end:String(end),limit:String(CHART_DATA_PAGE_SIZE),offset:String(offset)});
+    const page=await api('/api/recorder/data?'+query.toString());
+    if(requestId!==chartRequestId)return null;
+    if(!page||!Array.isArray(page.timestamp)||typeof page.aggregated!=='boolean'||typeof page.has_more!=='boolean')
+      throw new Error('Некорректный ответ истории');
+    if(aggregated!==null&&page.aggregated!==aggregated)
+      throw new Error('Тип данных истории изменился во время загрузки');
+    aggregated=page.aggregated;
+    const pageFields=page.aggregated?['avg','min','max']:['value'];
+    if(!pageFields.every(key=>Array.isArray(page[key])&&page[key].length===page.timestamp.length))
+      throw new Error('Неполная страница истории');
+    for(const key of pageFields)if(!fields.includes(key))fields.push(key);
+    pages.push(page);
+    offset+=page.timestamp.length;
+    updateChartLoadStatus(offset,performance.now()-startedAt);
+    if(!page.has_more)break;
+    if(!page.timestamp.length)throw new Error('Пустая страница помечена как неполная');
+  }
+  const data={aggregated};
+  for(const key of fields)data[key]=[];
+  for(const page of pages)for(const key of fields)data[key].push(...page[key]);
+  return data;
+}
+async function openChart(s,a){
+  destroyChart();
+  chartKey=s+'·'+a;chartHours=2;
+  const it=(recCfg.items||[]).find(x=>x.sensor===s&&x.attr===a);
+  $('rsens').value=s;$('rattr').value=a;
+  $('rdeb').value=it?it.debounce:60;
+  $('rthr').value=it?it.threshold:0;
+  $('rraw').value=it?it.max_raw_points:3000;
+  $('rhour').value=it?it.max_hour_points:8760;
+  $('ren').checked=!it||it.enabled!==false;
+  $('rdel').style.display=it?'':'none';
+  $('rht').textContent='График: '+s+' · '+a;
+  $('rmodal').classList.add('on');
+  drawChart();
+}
+$('redit-open').onclick=()=>$('redit').showModal();
+$('redit-close').onclick=$('redit-cancel').onclick=()=>$('redit').close();
+function resetChartZoom(){
+  if(chartInstance&&typeof chartInstance.resetZoom==='function')chartInstance.resetZoom();
+}
+$('rreset').onclick=resetChartZoom;
+function closeChart(){
+  chartRequestId++;
+  $('rmodal').classList.remove('on');
+  destroyChart();
+}
+$('rx').onclick=closeChart;
+$('rmodal').onclick=e=>{if(e.target===$('rmodal'))closeChart()};
+for(const b of $('rperiod').querySelectorAll('button'))b.onclick=()=>{for(const c of $('rperiod').querySelectorAll('button'))c.classList.toggle('on',c===b);chartHours=+b.dataset.hours;destroyChart();drawChart()};
+$('rsav').onclick=async()=>{
+  const deb=Math.max(1,Math.floor(Number($('rdeb').value))||1);
+  const thr=Math.max(0,Number($('rthr').value)||0);
+  const rpoints=Math.max(240,Math.floor(Number($('rraw').value))||3000);
+  const hpoints=Math.max(168,Math.floor(Number($('rhour').value))||8760);
+  const body={sensor:$('rsens').value,attr:$('rattr').value,debounce:deb,threshold:thr,max_raw_points:rpoints,max_hour_points:hpoints,enabled:$('ren').checked};
+  const r=await POST('/api/recorder/config',body);
+  if(r){$('redit').close();toast('✔ Подписка сохранена');recorderLoad();drawChart();}else toast('⚠ Ошибка сохранения');
+};
+$('rdel').onclick=()=>delRecorder($('rsens').value,$('rattr').value);
+async function drawChart(){
+  const requestId=++chartRequestId;
+  const c=$('rc');
+  const libraryPromise=loadChartLibrary();
+  const ac=getComputedStyle(document.documentElement).getPropertyValue('--color-warning').trim();
+  const tc=getComputedStyle(document.documentElement).getPropertyValue('--color-main').trim();
+  const grid=getComputedStyle(document.documentElement).getPropertyValue('--border-main').trim();
+  const end=Math.floor(Date.now()/1000);
+  const start=end-chartHours*3600;
+  let data;
+  try{data=await loadChartData($('rsens').value,$('rattr').value,start,end,requestId)}
+  catch(err){
+    if(requestId!==chartRequestId)return;
+    $('rload-status').textContent='Ошибка загрузки истории';
+    console.error('Failed to load chart history',err);
+    chartMessage(c,'ошибка загрузки данных',tc);return;
+  }
+  if(requestId!==chartRequestId)return;
+  if(!data||!data.timestamp||!data.timestamp.length){
+    chartMessage(c,'нет данных',tc,24);return;
+  }
+  renderChart(c,data,tc,ac,grid,start,end);
+  if(!chartLibraryReady&&!chartLibraryRenderFailed)libraryPromise.then(loaded=>{
+    if(loaded&&requestId===chartRequestId&&$('rmodal').classList.contains('on'))
+      renderChart(c,data,tc,ac,grid,start,end);
+  });
+}
+window.addEventListener('resize',()=>{if($('rmodal').classList.contains('on')&&!chartInstance)drawChart()});
 </script>
 <script>
 /* ==== Редактор Lua: онлайн-дополнение (подключается при наличии интернета) ====
